@@ -1,0 +1,26 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Getopt::Std;
+
+my %opt;
+getopts('q', \%opt) or die $! . $/;
+
+# print the header unless the quiet (-q) flag was given
+printf "\t%s:    %-10s   %-13s   %-34s   %s$/", 'LN', 'HEX', 'OCT', 'BIN', 'DEC'
+	unless $opt{q};
+
+# check if we are processing input interactively, otherwise hide the prompt
+my ($repl) = (-t STDIN and not @ARGV);
+sub prompt { print '> ' if $repl }
+
+prompt;
+while (<>) {
+	chomp;
+	if (/\S/) {
+		$_ = eval;
+		printf "\t%03d:   0x%08x   0o%011o   0b%032b   %d$/", $., $_, $_, $_, $_;
+	}
+	prompt;
+}
