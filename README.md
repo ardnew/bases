@@ -49,6 +49,19 @@ $ bases -b
 	+24:   0xde   0o0336   0b11011110   222
 ```
 
+As a special case, if a number contains hexadecimal digits (`[A-F]`), and does *not* have the `0x` prefix, then it is prepended automatically. Note that this processing occurs before any evaluation, so the following does *not* contain a number in scientific notation (`3e-48`). The second expression shows the expanded form:
+
+```
+$ bases
+> abc+1d2<<(3e-48)
+	LN:    HEX          OCT             BIN                                  DEC
+	003:   0x03238000   0o00310700000   0b00000011001000111000000000000000   52658176
+
+> 0xABC + 0x1D2 << (0x3E - 48)
+	LN:    HEX          OCT             BIN                                  DEC
+	004:   0x03238000   0o00310700000   0b00000011001000111000000000000000   52658176
+```
+
 ## Installation
 
 Clone this repo or copy the `bases` Perl script to any directory in your `PATH` environment variable, and enable execute permissions. For example:
