@@ -5,11 +5,7 @@ use warnings;
 use Getopt::Std;
 
 my %opt;
-getopts('q', \%opt) or die $! . $/;
-
-# print the header unless the quiet (-q) flag was given
-printf "\t%s:    %-10s   %-13s   %-34s   %s$/", 'LN', 'HEX', 'OCT', 'BIN', 'DEC'
-	unless $opt{q};
+getopts('qb', \%opt) or die $! . $/;
 
 # check if we are processing input interactively, otherwise hide the prompt
 my ($repl) = (-t STDIN and not @ARGV);
@@ -19,8 +15,32 @@ prompt;
 while (<>) {
 	chomp;
 	if (/\S/) {
+		# prepend missing "0x" to any words containing hex chars
+		s/\b[\dA-F]*[A-F][\dA-F]*\b/0x$&/ig;
 		$_ = eval;
-		printf "\t%03d:   0x%08x   0o%011o   0b%032b   %d$/", $., $_, $_, $_, $_;
+		my $n = $_ & 0xFFFFFFFF;
+		if ($n != $_) {
+			printf 'warning: input truncated to 32-bit' . $/
+		}
+
+		printf "[32-bit]" . $/ unless $opt{q} or not $repl or not $opt{b};
+		printf "\t%s:    %-10s   %-13s   %-34s   %s$/", 'LN', 'HEX', 'OCT', 'BIN', 'DEC' unless $opt{q};
+		printf "\t%03d:   0x%08x   0o%011o   0b%032b   %d$/", $., $n, $n, $n, $n;
+
+		if ($opt{b}) {
+			printf $/ . "[8-bit]" . $/ unless $opt{q} or not $repl;
+			printf "\t---" . $/ if $opt{q} and $repl;
+			printf "\t%s:   %-4s   %-6s   %-10s   %s$/", 'OFF', 'HEX', 'OCT', 'BIN', 'DEC' unless $opt{q};
+			my $v = $n;
+			my $i = 0;
+			do {
+				my $c = $v & 0xFF; $v >>= 8;
+				my $o = sprintf "+%d", 8 * $i;
+				printf "\t%3s:   0x%02x   0o%04o   0b%08b   %d" . $/, $o, $c, $c, $c, $c;
+				++$i;
+			} until $v == 0;
+		}
+		print $/ if $repl;
 	}
 	prompt;
 }
