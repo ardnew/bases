@@ -5,6 +5,8 @@
 
 `bases` is a simple utility to evaluate arithmetic and bitwise expressions and print the result in the most commonly used number bases: `BIN` (2), `OCT` (8), `DEC` (10), and `HEX` (16).
 
+Perl's `Term::Readline` module is required, which provides an input cursor and history support (via keyboard arrow keys).
+
 Invoked without any arguments, `bases` enters a run-eval-print-loop (REPL) that repeatedly prompts for user input and prints its evaluation, like a simple calculator (recognizing all valid Perl expressions):
 
 ```
