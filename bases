@@ -2,45 +2,116 @@
 
 use strict;
 use warnings;
+
+use Data::Dumper;
+
+use bigint;
+no warnings 'portable';
+
 use Getopt::Std;
+use Term::ReadLine;
+use POSIX qw| :sys_wait_h |;
 
 my %opt;
-getopts('qb', \%opt) or die $! . $/;
+# Available options:
+#   -b    Print each 8-bit word
+#   -h    Assume numeric literals without prefix are hexadecimmal
+#   -q    Compact format without headers
+#   -L    Long mode (32-bit)
+#   -Q    Quad mode (64-bit) (default)
+getopts('bhqLQ', \%opt) or die "$!\n";
+
+$opt{Q} = 1 unless $opt{L};
+
+sub unsigned { unpack('Q', pack('Q', (shift) || 0)) }
+
+sub mkprompt {
+  if ((shift)) {
+    my $term = Term::ReadLine->new("bases");
+    sub {
+      chomp if defined ($_ = $term->readline(' » '));
+      $_
+    }
+  } else {
+    sub { 
+      chomp if defined ($_ = <>);
+      $_ 
+    }
+  }
+}
 
 # check if we are processing input interactively, otherwise hide the prompt
 my ($repl) = (-t STDIN and not @ARGV);
-sub prompt { print '> ' if $repl }
 
-prompt;
-while (<>) {
-	chomp;
-	if (/\S/) {
-		# prepend missing "0x" to any words containing hex chars
-		s/\b[\dA-F]*[A-F][\dA-F]*\b/0x$&/ig;
-		$_ = eval;
-		my $n = $_ & 0xFFFFFFFF;
-		if ($n != $_) {
-			printf 'warning: input truncated to 32-bit' . $/
-		}
+my $prompt = mkprompt($repl);
+my $lineno = 0;
 
-		printf "[32-bit]" . $/ unless $opt{q} or not $repl or not $opt{b};
-		printf "\t%s:    %-10s   %-13s   %-34s   %s$/", 'LN', 'HEX', 'OCT', 'BIN', 'DEC' unless $opt{q};
-		printf "\t%03d:   0x%08x   0o%011o   0b%032b   %d$/", $., $n, $n, $n, $n;
+while (defined ($_ = $prompt->())) {
+  if (/\S/) {
+    if ($opt{h}) {
+      s/\b(?<!0[bdox])[\dA-F]+\b/0x$&/ig;   # assume all numeric literals without prefix are hex
+      s/\b0d//ig;                           # remove all "0d" decimal prefixes
+    }
+    s/\b[^0][\dA-F]*[A-F][\dA-F]*\b/0x$&/ig; # prepend missing "0x" to any words containing hex chars
 
-		if ($opt{b}) {
-			printf $/ . "[8-bit]" . $/ unless $opt{q} or not $repl;
-			printf "\t---" . $/ if $opt{q} and $repl;
-			printf "\t%s:   %-4s   %-6s   %-10s   %s$/", 'OFF', 'HEX', 'OCT', 'BIN', 'DEC' unless $opt{q};
-			my $v = $n;
-			my $i = 0;
-			do {
-				my $c = $v & 0xFF; $v >>= 8;
-				my $o = sprintf "+%d", 8 * $i;
-				printf "\t%3s:   0x%02x   0o%04o   0b%08b   %d" . $/, $o, $c, $c, $c, $c;
-				++$i;
-			} until $v == 0;
-		}
-		print $/ if $repl;
-	}
-	prompt;
+    my ($n, $w);
+
+    if ($opt{Q}) {
+      my $e = eval;
+      $_ = unsigned($e);
+      $n = $_ & 0xFFFFFFFFFFFFFFFF;
+      printf "warning: input truncated to 64-bit\n" if $n != $_;
+      $w = $n > 0xFFFFFFFF ? 64 : 32;
+    } else {
+      my $e = eval;
+      $_ = unsigned($e);
+      $n = $_ & 0xFFFFFFFF;
+      printf "warning: input truncated to 32-bit\n" if $n != $_;
+      $w = 32;
+    }
+
+    printf "[%d-bit]\n", $w unless $opt{q} or not $repl or not $opt{b};
+    if ($w == 64) {
+      printf "\t%03d:   %u\n", ++$., $n;
+      printf "\tHEX:   0x%016x\n", $n;
+      printf "\tOCT:   0o%022o\n", $n;
+      printf "\tBIN:   0x%064b\n", $n;
+      if ($opt{b}) {
+        printf "\n[32-bit]\n" unless $opt{q} or not $repl;
+        printf "\t---\n" if $opt{q} and $repl;
+        printf "\t%s:   %-10s   %-13s   %-34s   %s\n", 'OFF', 'HEX', 'OCT', 'BIN', 'DEC' unless $opt{q};
+        my $v = $n;
+        my $i = 0;
+        do {
+          my $c = $v & 0xFFFFFFFF; $v >>= 32;
+          my $o = sprintf '+%d', 32 * $i;
+          printf "\t%3s:   0x%08x   0o%011o   0b%032b   %d\n", $o, $c, $c, $c, $c;
+          ++$i;
+        } until $v == 0;
+      }
+
+    } else {
+      printf "\t%03d:   %u\n", ++$., $n;
+      printf "\tHEX:   0x%08x\n",  $n;
+      printf "\tOCT:   0o%011o\n", $n;
+      printf "\tBIN:   0x%032b\n", $n;
+      #printf "\t%s:    %-10s   %-13s   %-34s   %s\n", 'LN', 'HEX', 'OCT', 'BIN', 'DEC' unless $opt{q};
+      #printf "\t%03d:   0x%08x   0o%011o   0b%032b   %d\n", $., $n, $n, $n, $n;
+    }
+
+    if ($opt{b}) {
+      printf "\n[8-bit]\n" unless $opt{q} or not $repl;
+      printf "\t---\n" if $opt{q} and $repl;
+      printf "\t%s:   %-4s   %-6s   %-10s   %s\n", 'OFF', 'HEX', 'OCT', 'BIN', 'DEC' unless $opt{q};
+      my $v = $n;
+      my $i = 0;
+      do {
+        my $c = $v & 0xFF; $v >>= 8;
+        my $o = sprintf '+%d', 8 * $i;
+        printf "\t%3s:   0x%02x   0o%04o   0b%08b   %d\n", $o, $c, $c, $c, $c;
+        ++$i;
+      } until $v == 0;
+    }
+    print "\n" if $repl;
+  }
 }
