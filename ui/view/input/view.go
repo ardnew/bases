@@ -2,6 +2,7 @@ package input
 
 import (
 	"os"
+	"strings"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -85,7 +86,7 @@ func (v *View) InputHandler() func(*tcell.EventKey, func(p tview.Primitive)) {
 				}
 			case tcell.KeyRune:
 				if r := event.Rune(); mod == tcell.ModCtrl || (mod == tcell.ModNone &&
-					('0' <= r && r <= '9' || 'a' <= r && r <= 'f' || 'A' <= r && r <= 'F')) {
+					v.validKeyRune(r)) {
 					// Pass event on to InputField edit.
 					if v.edit != nil && v.edit.HasFocus() {
 						if h := v.edit.InputHandler(); h != nil {
@@ -120,6 +121,11 @@ func (v *View) MouseHandler() func(
 		}
 		return true, nil
 	})
+}
+
+func (v *View) validKeyRune(r rune) bool {
+	i, _ := v.base.GetCurrentOption()
+	return strings.ContainsRune(string(num.Base(i).Sym()), num.ToBaseSymCase(r))
 }
 
 func (v *View) change(text string) {
