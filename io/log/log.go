@@ -26,7 +26,7 @@ const (
 	Line     FmtSpec = 'n' // Line number: 23
 )
 
-var FmtDefault = "%d %t (%f:%n): %s"
+var FmtDefault = "%d %t ┆ %f:%n ┆ %s"
 
 // A Log represents an active logging object that generates lines of output to
 // an io.Writer. Each logging operation makes a single call to the Writer's
@@ -54,12 +54,7 @@ func New(out io.Writer, fmt string) *Log {
 // Output writes the output for a logging event.
 // A newline is appended if the last character of s is not already a newline.
 func (l *Log) Output(calldepth int, s string) error {
-	l.buf = l.buf[:0]
-	l.format(&l.buf, calldepth, s)
-	l.buf = append(l.buf, s...)
-	if len(s) == 0 || s[len(s)-1] != '\n' {
-		l.buf = append(l.buf, '\n')
-	}
+	l.format(calldepth, s)
 	_, err := l.out.Write(l.buf)
 	return err
 }
@@ -200,17 +195,17 @@ var spec = map[FmtSpec]func(b *[]byte, s string, t time.Time, f string, n int){
 
 // format replaces printf-style format specifiers found in fmt with their
 // corresponding values.
-func (l *Log) format(buf *[]byte, calldepth int, message string) {
+func (l *Log) format(calldepth int, message string) {
+	now, line := time.Now(), -1
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	var file string
-	line := -1
-	now := time.Now()
+	l.buf = l.buf[:0]
 	for i := 0; i < len(l.fmt)-1; i++ {
 		if l.fmt[i] == '%' {
 			i++
 			if f, ok := spec[FmtSpec(l.fmt[i])]; ok {
 				if line < 0 { // runtime callstack has never been retrieved
-					l.mu.Lock()
-					defer l.mu.Unlock()
 					if FmtSpec(l.fmt[i]) == FileBase ||
 						FmtSpec(l.fmt[i]) == FilePath {
 						// release lock while getting caller info - it's expensive.
@@ -223,15 +218,18 @@ func (l *Log) format(buf *[]byte, calldepth int, message string) {
 						l.mu.Lock()
 					}
 				}
-				f(buf, message, now, file, line)
+				f(&l.buf, message, now, file, line)
 			} else {
 				// format specifier unrecognized, write it out literally
-				*buf = append(*buf, '%')
-				*buf = append(*buf, []byte(string(l.fmt[i]))...)
+				l.buf = append(l.buf, '%')
+				l.buf = append(l.buf, []byte(string(l.fmt[i]))...)
 			}
 		} else {
 			// write any extraneous runes in the format string literally to output
-			*buf = append(*buf, []byte(string(l.fmt[i]))...)
+			l.buf = append(l.buf, []byte(string(l.fmt[i]))...)
 		}
+	}
+	if n := len(l.buf); n == 0 || l.buf[n-1] != '\n' {
+		l.buf = append(l.buf, '\n')
 	}
 }
