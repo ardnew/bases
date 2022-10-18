@@ -1,15 +1,38 @@
 package expr
 
 import (
+	"go/token"
 	"strings"
 
-	"github.com/ardnew/bases/io/syntax/parse/atom"
-	"github.com/ardnew/bases/io/syntax/parse/op"
-	"github.com/ardnew/bases/io/syntax/parse/state"
+	"github.com/ardnew/bases/io/syntax/parse"
+	"github.com/ardnew/bases/io/syntax/parse/expr/atom"
+	"github.com/ardnew/bases/io/syntax/parse/expr/op"
+	"github.com/ardnew/bases/io/syntax/parse/lex"
 )
 
 type Expr interface {
 	String() string
+	Parse(lex lex.Lexer) parse.State
+}
+
+var literal = []token.Token{
+	token.IDENT, token.INT, token.FLOAT, token.IMAG, token.CHAR, token.STRING,
+}
+
+func Parse(lex lex.Lexer) (state parse.State) {
+	var lhs Expr
+	lhs = &Prim{}
+	if state = lhs.Parse(lex); state == nil {
+		lhs = &Prefix{}
+		if state = lhs.Parse(lex); state == nil {
+			return
+		}
+	}
+
+	return nil
+}
+
+func parsePrim(lex lex.Lexer) (e Prim) {
 }
 
 // Prim represents a literal in any one of the five basic types: integer,
@@ -27,12 +50,32 @@ func (x *Prim) String() string {
 	return x.Atom.String()
 }
 
+// Parse parses tokens from the given Lexer to construct this expression and
+// returns a parser for the next valid tokens.
+// Nil is returned if the Lexer does not emit valid tokens for this expression.
+func (x *Prim) Parse(lex lex.Lexer) parse.State {
+	a := lex.Emit()
+	if a.IsLiteral() {
+		x.Atom = a
+		return Parse
+	}
+	go lex.Undo(a)
+	return nil
+}
+
 // Ident represents a variable identifier following the definition from the Go
 // language spec (and implemented by the Go lexical scanner).
 type Ident struct{ atom.Atom }
 
 func (x *Ident) String() string {
 	return x.Atom.String()
+}
+
+// Parse parses tokens from the given Lexer to construct this expression and
+// returns a parser for the next valid tokens.
+// Nil is returned if the Lexer does not emit valid tokens for this expression.
+func (x *Ident) Parse(lex lex.Lexer) parse.State {
+	return Parse
 }
 
 // Assign represents an assignment expression. That is, a variable identifier is
@@ -58,9 +101,10 @@ func (x *Ident) String() string {
 //  1. a = 1 + b = 3
 //  2. a = 11 = 3      <-- error!
 //
-// The error on line 2 of the example above is because the assignment operator
-// "=" is right-associative, which results in attempting to evaluate "11 = 3",
-// and even this weirdo program doesn't allow assignment to numeric literals.
+// The error above is because the assignment operator "=" is right-associative,
+// which results in attempting to evaluate "11 = 3", and even this weirdo
+// program doesn't allow assignment to numeric literals — an Ident expression is
+// the only valid expression on the LHS of an assignment.
 type Assign struct {
 	Expr
 	Ident // Identifier being assigned with Expr
@@ -74,6 +118,13 @@ func (x *Assign) String() string {
 	b.WriteString(x.Expr.String())
 	b.WriteString(") ")
 	return b.String()
+}
+
+// Parse parses tokens from the given Lexer to construct this expression and
+// returns a parser for the next valid tokens.
+// Nil is returned if the Lexer does not emit valid tokens for this expression.
+func (x *Assign) Parse(lex lex.Lexer) parse.State {
+	return Parse
 }
 
 type Infix struct {
@@ -91,22 +142,16 @@ func (x *Infix) String() string {
 	return b.String()
 }
 
+// Parse parses tokens from the given Lexer to construct this expression and
+// returns a parser for the next valid tokens.
+// Nil is returned if the Lexer does not emit valid tokens for this expression.
+func (x *Infix) Parse(lex lex.Lexer) parse.State {
+	return Parse
+}
+
 type Prefix struct {
 	Expr
 	op.Operator
-}
-
-func (x *Prefix) Parse(e state.Emitter) state.Parser {
-	m := make(atom.Stream)
-	go e.Emit(m)
-	a, ok := <-m
-	if !ok {
-		// EOF
-	}
-	o, ok := op.Prefix[a.Token]
-	if !ok {
-		// Not a prefix operator
-	}
 }
 
 func (x *Prefix) String() string {
@@ -116,6 +161,13 @@ func (x *Prefix) String() string {
 	b.WriteString(x.Expr.String())
 	b.WriteString(") ")
 	return b.String()
+}
+
+// Parse parses tokens from the given Lexer to construct this expression and
+// returns a parser for the next valid tokens.
+// Nil is returned if the Lexer does not emit valid tokens for this expression.
+func (x *Prefix) Parse(lex lex.Lexer) parse.State {
+	return Parse
 }
 
 type Postfix struct {
@@ -130,4 +182,11 @@ func (x *Postfix) String() string {
 	b.WriteString(x.Operator.String())
 	b.WriteString(") ")
 	return b.String()
+}
+
+// Parse parses tokens from the given Lexer to construct this expression and
+// returns a parser for the next valid tokens.
+// Nil is returned if the Lexer does not emit valid tokens for this expression.
+func (x *Postfix) Parse(lex lex.Lexer) parse.State {
+	return Parse
 }
