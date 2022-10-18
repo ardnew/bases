@@ -12,6 +12,8 @@ func init() {
 	Postfix.Reset()
 	Infix.Reset()
 
+	Prefix.Add(23, UnaryRight, token.LPAREN)
+
 	Infix.Add(22, BinaryRight, token.PERIOD)
 
 	Postfix.Add(21, UnaryLeft, token.INC, token.DEC)
@@ -64,6 +66,24 @@ type Operator struct {
 }
 
 func (p Operator) String() string { return p.Token.String() }
+
+func (p Operator) precedence() (n int) {
+	defer func() { n /= 2 }()
+	switch {
+	case p.L == Unbound && p.R == Unbound:
+		return 0
+	case p.L == Unbound:
+		return p.R.Int() + 1
+	case p.R == Unbound:
+		return p.L.Int() + 1
+	default:
+		l, r := p.L.Int(), p.R.Int()
+		if l < r {
+			return r
+		}
+		return l
+	}
+}
 
 type Table struct {
 	Lut map[token.Token]Operator // Operator lookup table, keyed by Token.
@@ -122,7 +142,7 @@ func (m *Table) Len() int { return len(m.Ord) }
 // is not a transitive ordering when not-a-number (NaN) values are involved.
 // See Float64Slice.Less for a correct implementation for floating-point values.
 func (m *Table) Less(i, j int) bool {
-	return m.Ord[i].L.Int() > m.Ord[j].L.Int() // May use/compare L or R (or both)
+	return m.Ord[i].precedence() > m.Ord[j].precedence()
 }
 
 // Swap swaps the elements with indexes i and j.

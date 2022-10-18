@@ -143,53 +143,75 @@ func itoa(buf *[]byte, i int, wid int) {
 	*buf = append(*buf, b[bp:]...)
 }
 
-var spec = map[FmtSpec]func(b *[]byte, s string, t time.Time, f string, n int){
-	Message: func(b *[]byte, s string, t time.Time, f string, n int) {
-		*b = append(*b, s...)
+// specArgs encapsulates the set of all potentially-used arguments by any given
+// format specifier handler function.
+//
+// This encapsulation is required to trick the static analyzer into not
+// identifying potentially unused arguments in the map functions defined in spec
+// below.
+type specArgs struct {
+	mesg string
+	time time.Time
+	file string
+	line int
+}
+
+// specFunc defines a format specifier handler function that formats data
+// derived from specArgs and writes the formatted data to the output byte slice
+// referenced in out.
+//
+// The output byte slice referenced in out is not a field of specArgs because
+// a.) it is a required (non-nil) argument for all formatting functions, and
+// b.) it is an output parameter — not an input argument controlling format.
+type specFunc func(out *[]byte, a specArgs)
+
+var spec = map[FmtSpec]func(out *[]byte, a specArgs){
+	Message: func(out *[]byte, a specArgs) {
+		*out = append(*out, a.mesg...)
 	},
-	Date: func(b *[]byte, s string, t time.Time, f string, n int) {
-		year, month, day := t.Date()
-		itoa(b, year, 4)
-		*b = append(*b, '/')
-		itoa(b, int(month), 2)
-		*b = append(*b, '/')
-		itoa(b, day, 2)
+	Date: func(out *[]byte, a specArgs) {
+		year, month, day := a.time.Date()
+		itoa(out, year, 4)
+		*out = append(*out, '/')
+		itoa(out, int(month), 2)
+		*out = append(*out, '/')
+		itoa(out, day, 2)
 	},
-	Time: func(b *[]byte, s string, t time.Time, f string, n int) {
-		hour, min, sec := t.Clock()
-		itoa(b, hour, 2)
-		*b = append(*b, ':')
-		itoa(b, min, 2)
-		*b = append(*b, ':')
-		itoa(b, sec, 2)
+	Time: func(out *[]byte, a specArgs) {
+		hour, min, sec := a.time.Clock()
+		itoa(out, hour, 2)
+		*out = append(*out, ':')
+		itoa(out, min, 2)
+		*out = append(*out, ':')
+		itoa(out, sec, 2)
 	},
-	Micros: func(b *[]byte, s string, t time.Time, f string, n int) {
+	Micros: func(out *[]byte, a specArgs) {
 		// spec[Time](b, t, file, line)
-		hour, min, sec := t.Clock()
-		itoa(b, hour, 2)
-		*b = append(*b, ':')
-		itoa(b, min, 2)
-		*b = append(*b, ':')
-		itoa(b, sec, 2)
-		*b = append(*b, '.')
-		itoa(b, t.Nanosecond()/1e3, 6)
+		hour, min, sec := a.time.Clock()
+		itoa(out, hour, 2)
+		*out = append(*out, ':')
+		itoa(out, min, 2)
+		*out = append(*out, ':')
+		itoa(out, sec, 2)
+		*out = append(*out, '.')
+		itoa(out, a.time.Nanosecond()/1e3, 6)
 	},
-	FilePath: func(b *[]byte, s string, t time.Time, f string, n int) {
-		*b = append(*b, f...)
+	FilePath: func(out *[]byte, a specArgs) {
+		*out = append(*out, a.file...)
 	},
-	FileBase: func(b *[]byte, s string, t time.Time, f string, n int) {
-		short := f
-		for i := len(f) - 1; i > 0; i-- {
-			if f[i] == '/' {
-				short = f[i+1:]
+	FileBase: func(out *[]byte, a specArgs) {
+		short := a.file
+		for i := len(a.file) - 1; i > 0; i-- {
+			if a.file[i] == '/' {
+				short = a.file[i+1:]
 				break
 			}
 		}
 		// spec[FilePath](b, t, short, line)
-		*b = append(*b, short...)
+		*out = append(*out, short...)
 	},
-	Line: func(b *[]byte, s string, t time.Time, f string, n int) {
-		itoa(b, n, -1)
+	Line: func(out *[]byte, a specArgs) {
+		itoa(out, a.line, -1)
 	},
 }
 
@@ -218,7 +240,7 @@ func (l *Log) format(calldepth int, message string) {
 						l.mu.Lock()
 					}
 				}
-				f(&l.buf, message, now, file, line)
+				f(&l.buf, specArgs{mesg: message, time: now, file: file, line: line})
 			} else {
 				// format specifier unrecognized, write it out literally
 				l.buf = append(l.buf, '%')

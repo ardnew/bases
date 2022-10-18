@@ -1,6 +1,9 @@
 package eval
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/ardnew/bases/io/syntax/parse"
 	"github.com/ardnew/bases/io/syntax/parse/expr"
 	"github.com/ardnew/bases/io/syntax/parse/lex/scan"
@@ -20,6 +23,21 @@ func EvalString(s string) error {
 }
 
 func (e *eval) Parse() error {
+	var f, hello, world func()
+	hello = func() {
+		fmt.Print("hello ")
+		f = world
+	}
+	world = func() {
+		fmt.Println("world!")
+		f = hello
+	}
+	f = hello
+	for f != nil {
+		f()
+		time.Sleep(time.Second)
+	}
+
 	for e.State != nil {
 		e.State = e.State(e)
 	}

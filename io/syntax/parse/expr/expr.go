@@ -1,13 +1,12 @@
 package expr
 
 import (
-	"go/token"
 	"strings"
 
 	"github.com/ardnew/bases/io/syntax/parse"
-	"github.com/ardnew/bases/io/syntax/parse/expr/atom"
 	"github.com/ardnew/bases/io/syntax/parse/expr/op"
 	"github.com/ardnew/bases/io/syntax/parse/lex"
+	"github.com/ardnew/bases/io/syntax/parse/lex/atom"
 )
 
 type Expr interface {
@@ -15,25 +14,16 @@ type Expr interface {
 	Parse(lex lex.Lexer) parse.State
 }
 
-var literal = []token.Token{
-	token.IDENT, token.INT, token.FLOAT, token.IMAG, token.CHAR, token.STRING,
-}
+// var literal = []token.Token{
+// 	token.IDENT, token.INT, token.FLOAT, token.IMAG, token.CHAR, token.STRING,
+// }
 
 func Parse(lex lex.Lexer) (state parse.State) {
-	var lhs Expr
-	lhs = &Prim{}
-	if state = lhs.Parse(lex); state == nil {
-		lhs = &Prefix{}
-		if state = lhs.Parse(lex); state == nil {
-			return
-		}
-	}
-
-	return nil
+	return (&Prefix{}).Parse
 }
 
-func parsePrim(lex lex.Lexer) (e Prim) {
-}
+// func parsePrim(lex lex.Lexer) (e Prim) {
+// }
 
 // Prim represents a literal in any one of the five basic types: integer,
 // floating-point, imaginary, rune, or string.
@@ -61,7 +51,6 @@ func (x *Prim) Parse(lex lex.Lexer) parse.State {
 	}
 	go lex.Undo(a)
 	return nil
-}
 
 // Ident represents a variable identifier following the definition from the Go
 // language spec (and implemented by the Go lexical scanner).
@@ -167,6 +156,9 @@ func (x *Prefix) String() string {
 // returns a parser for the next valid tokens.
 // Nil is returned if the Lexer does not emit valid tokens for this expression.
 func (x *Prefix) Parse(lex lex.Lexer) parse.State {
+	for _, o := range op.Prefix.Ord {
+
+	}
 	return Parse
 }
 

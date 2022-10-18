@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/ardnew/bases/io/log"
-	"github.com/ardnew/bases/io/syntax/parse/expr/atom"
+	"github.com/ardnew/bases/io/syntax/parse/lex/atom"
 )
 
 // Scan contains the Go lexical scanner and provides methods for progressively
@@ -59,6 +59,12 @@ func (s *Scan) Emit() (a atom.Atom) {
 	return
 }
 
+func (s *Scan) Peek() (a atom.Atom) {
+	a = s.Emit()
+	go s.Undo(a)
+	return
+}
+
 func (s *Scan) Undo(a atom.Atom) { s.undo <- a }
 
 func (s *Scan) Fail(a atom.Atom, expect ...token.Token) {
@@ -69,11 +75,11 @@ func (s *Scan) Fail(a atom.Atom, expect ...token.Token) {
 		b.WriteString(" (expected: ")
 		switch n {
 		case 1:
-			b.WriteString(atom.Enquote(expect[0]))
+			b.WriteString(atom.Atom{Token: expect[0]}.QQ())
 		case 2:
-			b.WriteString(atom.Enquote(expect[0]))
+			b.WriteString(atom.Atom{Token: expect[0]}.QQ())
 			b.WriteString(" or ")
-			b.WriteString(atom.Enquote(expect[1]))
+			b.WriteString(atom.Atom{Token: expect[1]}.QQ())
 		default:
 			for i, e := range expect {
 				if i > 1 {
@@ -82,7 +88,7 @@ func (s *Scan) Fail(a atom.Atom, expect ...token.Token) {
 						b.WriteString("or ")
 					}
 				}
-				b.WriteString(atom.Enquote(e))
+				b.WriteString(atom.Atom{Token: e}.QQ())
 			}
 		}
 		b.WriteRune(')')
