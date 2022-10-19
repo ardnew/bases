@@ -4,4 +4,7 @@ import (
 	"github.com/ardnew/bases/io/syntax/parse/lex"
 )
 
-type State func(lex lex.Lexer) State
+type State interface {
+	Next(lex lex.Lexer) State
+	String() string
+}

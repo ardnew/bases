@@ -67,7 +67,11 @@ type Operator struct {
 
 func (p Operator) String() string { return p.Token.String() }
 
-func (p Operator) precedence() (n int) {
+func (p Operator) Is(tok token.Token) bool {
+	return p.Token == tok
+}
+
+func (p Operator) Precedence() (n int) {
 	defer func() { n /= 2 }()
 	switch {
 	case p.L == Unbound && p.R == Unbound:
@@ -88,6 +92,11 @@ func (p Operator) precedence() (n int) {
 type Table struct {
 	Lut map[token.Token]Operator // Operator lookup table, keyed by Token.
 	Ord []Operator               // All elements in Op sorted by precedence.
+}
+
+func (m *Table) Lookup(tok token.Token) (op Operator, ok bool) {
+	op, ok = m.Lut[tok]
+	return
 }
 
 func (m *Table) Reset() {
@@ -142,7 +151,7 @@ func (m *Table) Len() int { return len(m.Ord) }
 // is not a transitive ordering when not-a-number (NaN) values are involved.
 // See Float64Slice.Less for a correct implementation for floating-point values.
 func (m *Table) Less(i, j int) bool {
-	return m.Ord[i].precedence() > m.Ord[j].precedence()
+	return m.Ord[i].Precedence() > m.Ord[j].Precedence()
 }
 
 // Swap swaps the elements with indexes i and j.

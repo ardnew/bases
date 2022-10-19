@@ -40,14 +40,6 @@ func (s *Scan) Init(src []byte) *Scan {
 	return s
 }
 
-func (s *Scan) Error() (err string) {
-	if s.errs.Len() > 0 {
-		s.errs.RemoveMultiples()
-		err = s.errs.Error()
-	}
-	return
-}
-
 // Emit scans and returns the next token from the input stream.
 func (s *Scan) Emit() (a atom.Atom) {
 	select {
@@ -94,6 +86,14 @@ func (s *Scan) Fail(a atom.Atom, expect ...token.Token) {
 		b.WriteRune(')')
 	}
 	s.addError(s.fset.Position(a.Pos), b.String())
+}
+
+func (s *Scan) Error() (err string) {
+	if s.errs.Len() > 0 {
+		s.errs.RemoveMultiples()
+		err = s.errs.Error()
+	}
+	return
 }
 
 func (s *Scan) addError(pos token.Position, msg string) {
