@@ -16,33 +16,28 @@ type Exprer interface {
 
 type Expr string
 
+func Parse(lex lex.Lexer) parse.Parser {
+	return Expr("").Parse(lex)
+}
+
 func (Expr) Parse(lex lex.Lexer) parse.Parser {
+	if pre, ok := op.Prefix(lex.Next().Token); ok {
+		return (&Prefix{Operator: pre}).Parse(lex)
+	} else {
+		if prim := (&Prim{}).Parse(lex); prim != nil {
+			return prim
+		}
+		if iden := (&Ident{}).Parse(lex); iden != nil {
+			return iden
+		}
+	}
+
 	return nil // the base Expr is fully parsed
 }
 
 func (e Expr) String() string {
 	return string(e)
 }
-
-// var literal = []token.Token{
-// 	token.IDENT, token.INT, token.FLOAT, token.IMAG, token.CHAR, token.STRING,
-// }
-
-func Parse(lex lex.Lexer) (state parse.State) {
-	var next func() Expr
-	next = func() Expr {
-		if e := (&Prim{}).Parse(lex); e != nil {
-			return e
-		}
-		if e := (&Ident{}).Parse(lex); e != nil {
-			return e
-		}
-	}
-	return nil
-}
-
-// func parsePrim(lex lex.Lexer) (e Prim) {
-// }
 
 // Prim represents a literal in any one of the five basic types: integer,
 // floating-point, imaginary, rune, or string.
@@ -63,12 +58,11 @@ func (x *Prim) String() string {
 // returns a parser for the next valid tokens.
 // Nil is returned if the Lexer does not emit valid tokens for this expression.
 func (x *Prim) Parse(lex lex.Lexer) parse.Parser {
-	a := lex.Emit()
+	a := lex.Curr()
 	if a.IsLiteral() {
 		x.Atom = a
-		return Expr(x.String())
+		return x
 	}
-	go lex.Undo(a)
 	return nil
 }
 
@@ -84,12 +78,11 @@ func (x *Ident) String() string {
 // returns a parser for the next valid tokens.
 // Nil is returned if the Lexer does not emit valid tokens for this expression.
 func (x *Ident) Parse(lex lex.Lexer) parse.Parser {
-	a := lex.Emit()
-	if a.Token == token.IDENT {
+	a := lex.Curr()
+	if a.Token == token.IDENT && token.IsIdentifier(a.Lit) {
 		x.Atom = a
-		return Expr(x.String())
+		return x
 	}
-	go lex.Undo(a)
 	return nil
 }
 
@@ -139,7 +132,7 @@ func (x *Assign) String() string {
 // returns a parser for the next valid tokens.
 // Nil is returned if the Lexer does not emit valid tokens for this expression.
 func (x *Assign) Parse(lex lex.Lexer) parse.Parser {
-	return Parse
+	return nil
 }
 
 type Infix struct {
@@ -161,7 +154,7 @@ func (x *Infix) String() string {
 // returns a parser for the next valid tokens.
 // Nil is returned if the Lexer does not emit valid tokens for this expression.
 func (x *Infix) Parse(lex lex.Lexer) parse.Parser {
-	return Parse
+	return nil
 }
 
 type Prefix struct {
@@ -179,21 +172,18 @@ func (x *Prefix) String() string {
 }
 
 func (x *Prefix) isValid() bool {
-	return x.Token != token.ILLEGAL
+	return x.Token() != token.ILLEGAL
 }
 
 // Parse parses tokens from the given Lexer to construct this expression and
 // returns a parser for the next valid tokens.
 // Nil is returned if the Lexer does not emit valid tokens for this expression.
 func (x *Prefix) Parse(lex lex.Lexer) parse.Parser {
-	a := lex.Emit()
-	for _, o := range op.Prefix.Ord {
-		if o.Is(a.Token) {
-			x.Operator = o
-			x.Exprer =
-		}
+	e := Parse(lex)
+	if e != nil {
+		x.Exprer = e
+		return x
 	}
-	go lex.Undo(a)
 	return nil
 }
 
@@ -215,5 +205,5 @@ func (x *Postfix) String() string {
 // returns a parser for the next valid tokens.
 // Nil is returned if the Lexer does not emit valid tokens for this expression.
 func (x *Postfix) Parse(lex lex.Lexer) parse.Parser {
-	return Parse
+	return nil
 }

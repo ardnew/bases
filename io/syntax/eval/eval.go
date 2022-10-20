@@ -13,12 +13,18 @@ type eval struct {
 
 func EvalString(s string) error {
 	e := eval{
-		Parser: expr.Parse,
+		Parser: expr.Expr(""),
 		Scan:   scan.NewScan().Init([]byte(s)),
 	}
-	return e.Parse()
+	for e.Parser != nil {
+		e.Parser = e.Parse(e)
+	}
+	return e.Scan
 }
 
-func (e *eval) Parse() error {
-	return e
-}
+//func (e *eval) Parse() error {
+//	for e.Parser != nil {
+//		e.Parser = e.Parser.Parse(e)
+//	}
+//	return e
+//}

@@ -14,9 +14,10 @@ import (
 // emitting tokens from the input stream.
 type Scan struct {
 	log  *log.Log
-	undo atom.Stream
-	fset *token.FileSet
 	errs scanner.ErrorList
+	fset *token.FileSet
+	undo atom.Stream
+	curr atom.Atom
 	scanner.Scanner
 }
 
@@ -40,8 +41,9 @@ func (s *Scan) Init(src []byte) *Scan {
 	return s
 }
 
-// Emit scans and returns the next token from the input stream.
-func (s *Scan) Emit() (a atom.Atom) {
+// Next scans and returns the next token from the input stream.
+func (s *Scan) Next() (a atom.Atom) {
+	defer func() { s.curr = a }()
 	select {
 	case a = <-s.undo:
 	default:
@@ -51,8 +53,10 @@ func (s *Scan) Emit() (a atom.Atom) {
 	return
 }
 
+func (s *Scan) Curr() (a atom.Atom) { return s.curr }
+
 func (s *Scan) Peek() (a atom.Atom) {
-	a = s.Emit()
+	a = s.Next()
 	go s.Undo(a)
 	return
 }

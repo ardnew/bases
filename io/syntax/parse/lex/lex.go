@@ -7,7 +7,8 @@ import (
 )
 
 type Lexer interface {
-	Emit() (a atom.Atom)
+	Next() (a atom.Atom)
+	Curr() (a atom.Atom)
 	Peek() (a atom.Atom)
 	Undo(a atom.Atom)
 	Fail(a atom.Atom, expect ...token.Token)

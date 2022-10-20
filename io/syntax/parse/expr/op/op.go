@@ -2,47 +2,96 @@ package op
 
 import (
 	"go/token"
-	"sort"
 )
 
-var Prefix, Postfix, Infix Table
+func init() { Default.Reset() }
 
-func init() {
-	Prefix.Reset()
-	Postfix.Reset()
-	Infix.Reset()
+// Prefix calls method [Default.Prefix], which is the default prefix operator
+// precedence table.
+func Prefix(tok token.Token) (Operator, bool) { return Default.Prefix(tok) }
 
-	Prefix.Add(23, UnaryRight, token.LPAREN)
+// Postfix calls method [Default.Postfix], which is the default postfix operator
+// precedence table.
+func Postfix(tok token.Token) (Operator, bool) { return Default.Postfix(tok) }
 
-	Infix.Add(22, BinaryRight, token.PERIOD)
+// Infix calls method [Default.Infix], which is the default infix operator
+// precedence table.
+func Infix(tok token.Token) (Operator, bool) { return Default.Infix(tok) }
 
-	Postfix.Add(21, UnaryLeft, token.INC, token.DEC)
+// Operator provides an abstraction for any type of operator in prefix, postfix,
+// infix, or other complex expressions.
+type Operator struct {
+	bll, blr Level
+	prc      int
+	ass      Assoc
+	tok      token.Token
+}
 
-	Prefix.Add(20, UnaryRight, token.INC, token.DEC)
-	Prefix.Add(19, UnaryRight, token.ADD, token.SUB)
-	Prefix.Add(18, UnaryRight, token.NOT, token.TILDE)
+func (p Operator) String() string { return p.tok.String() }
 
-	Infix.Add(17, BinaryLeft, token.MUL, token.QUO, token.REM)
-	Infix.Add(16, BinaryLeft, token.ADD, token.SUB)
-	Infix.Add(15, BinaryLeft, token.SHL, token.SHR)
-	Infix.Add(14, BinaryLeft, token.LSS, token.GTR, token.LEQ, token.GEQ)
-	Infix.Add(13, BinaryLeft, token.EQL, token.NEQ)
-	Infix.Add(12, BinaryLeft, token.AND)
-	Infix.Add(11, BinaryLeft, token.AND_NOT)
-	Infix.Add(10, BinaryLeft, token.XOR)
-	Infix.Add(9, BinaryLeft, token.OR)
-	Infix.Add(8, BinaryLeft, token.LAND)
-	Infix.Add(7, BinaryLeft, token.LOR)
-	Infix.Add(6, BinaryRight, token.DEFINE, token.ASSIGN)
-	Infix.Add(5, BinaryRight, token.ADD_ASSIGN, token.SUB_ASSIGN)
-	Infix.Add(4, BinaryRight, token.MUL_ASSIGN, token.QUO_ASSIGN, token.REM_ASSIGN)
-	Infix.Add(3, BinaryRight, token.SHL_ASSIGN, token.SHR_ASSIGN)
-	Infix.Add(2, BinaryRight, token.AND_ASSIGN, token.AND_NOT_ASSIGN, token.XOR_ASSIGN, token.OR_ASSIGN)
-	Infix.Add(1, BinaryLeft, token.COMMA, token.SEMICOLON)
+func (p Operator) Precedence() int      { return p.prc }
+func (p Operator) Associativity() Assoc { return p.ass }
+func (p Operator) Order() (int, Assoc)  { return p.prc, p.ass }
+func (p Operator) Token() token.Token   { return p.tok }
 
-	Prefix.Sort()
-	Postfix.Sort()
-	Infix.Sort()
+// Go lexer currently recognizes 89 tokens — not just operators — but we need
+// to have enough indices for an operator token constant defined anywhere in the
+// enumerated list of tokens. This enables constant-time lookup for operator
+// tokens, instead of a map's relatively more-expensive hashing function.
+const maxOperators = 128
+
+type Table [maxOperators]Operator
+
+func (m *Table) Reset() { *m = Table{} }
+
+func (m *Table) Get(tok token.Token) (op Operator, ok bool) {
+	if 0 <= int(tok) && int(tok) < maxOperators {
+		op, ok = m[tok], (m[tok].bll != Unbound) || (m[tok].blr != Unbound)
+	}
+	return
+}
+
+func (m *Table) Add(prec int, assoc Assoc, tok ...token.Token) {
+	lhs, rhs := assoc.Level(prec)
+	for _, t := range tok {
+		m[t] = Operator{bll: lhs, blr: rhs, prc: prec, ass: assoc, tok: t}
+	}
+}
+
+type Schema struct{ prefix, postfix, infix Table }
+
+func (s *Schema) Reset() {
+	s.prefix.Reset()
+	s.postfix.Reset()
+	s.infix.Reset()
+
+	s.prefix.Add(23, UnaryRight, token.LPAREN)
+
+	s.infix.Add(22, BinaryRight, token.PERIOD)
+
+	s.postfix.Add(21, UnaryLeft, token.INC, token.DEC)
+
+	s.prefix.Add(20, UnaryRight, token.INC, token.DEC)
+	s.prefix.Add(19, UnaryRight, token.ADD, token.SUB)
+	s.prefix.Add(18, UnaryRight, token.NOT, token.TILDE)
+
+	s.infix.Add(17, BinaryLeft, token.MUL, token.QUO, token.REM)
+	s.infix.Add(16, BinaryLeft, token.ADD, token.SUB)
+	s.infix.Add(15, BinaryLeft, token.SHL, token.SHR)
+	s.infix.Add(14, BinaryLeft, token.LSS, token.GTR, token.LEQ, token.GEQ)
+	s.infix.Add(13, BinaryLeft, token.EQL, token.NEQ)
+	s.infix.Add(12, BinaryLeft, token.AND)
+	s.infix.Add(11, BinaryLeft, token.AND_NOT)
+	s.infix.Add(10, BinaryLeft, token.XOR)
+	s.infix.Add(9, BinaryLeft, token.OR)
+	s.infix.Add(8, BinaryLeft, token.LAND)
+	s.infix.Add(7, BinaryLeft, token.LOR)
+	s.infix.Add(6, BinaryRight, token.DEFINE, token.ASSIGN)
+	s.infix.Add(5, BinaryRight, token.ADD_ASSIGN, token.SUB_ASSIGN)
+	s.infix.Add(4, BinaryRight, token.MUL_ASSIGN, token.QUO_ASSIGN, token.REM_ASSIGN)
+	s.infix.Add(3, BinaryRight, token.SHL_ASSIGN, token.SHR_ASSIGN)
+	s.infix.Add(2, BinaryRight, token.AND_ASSIGN, token.AND_NOT_ASSIGN, token.XOR_ASSIGN, token.OR_ASSIGN)
+	s.infix.Add(1, BinaryLeft, token.COMMA, token.SEMICOLON)
 
 	// Unhandled recognizable tokens:
 	//   ARROW    // <-
@@ -58,105 +107,16 @@ func init() {
 	//   RBRACE   // }
 }
 
-// Operator provides an abstraction for any type of operator in prefix, postfix,
-// infix, or other complex expressions.
-type Operator struct {
-	L, R Level
-	token.Token
+func (s *Schema) Prefix(t token.Token) (Operator, bool) {
+	return s.prefix.Get(t)
 }
 
-func (p Operator) String() string { return p.Token.String() }
-
-func (p Operator) Is(tok token.Token) bool {
-	return p.Token == tok
+func (s *Schema) Postfix(tok token.Token) (Operator, bool) {
+	return s.postfix.Get(tok)
 }
 
-func (p Operator) Precedence() (n int) {
-	defer func() { n /= 2 }()
-	switch {
-	case p.L == Unbound && p.R == Unbound:
-		return 0
-	case p.L == Unbound:
-		return p.R.Int() + 1
-	case p.R == Unbound:
-		return p.L.Int() + 1
-	default:
-		l, r := p.L.Int(), p.R.Int()
-		if l < r {
-			return r
-		}
-		return l
-	}
+func (s *Schema) Infix(tok token.Token) (Operator, bool) {
+	return s.infix.Get(tok)
 }
 
-type Table struct {
-	Lut map[token.Token]Operator // Operator lookup table, keyed by Token.
-	Ord []Operator               // All elements in Op sorted by precedence.
-}
-
-func (m *Table) Lookup(tok token.Token) (op Operator, ok bool) {
-	op, ok = m.Lut[tok]
-	return
-}
-
-func (m *Table) Reset() {
-	if m != nil {
-		*m = Table{
-			Lut: map[token.Token]Operator{},
-			Ord: []Operator{},
-		}
-	}
-}
-
-// Add adds an arbitrary number of given [token.Token] keys mapped to Operator
-// values constructed with the given precedence, associativity, and
-// [state.Parser] state function.
-//
-// You must call Sort after all elements have been added via method Add.
-// Otherwise, the elements in Ord may not be ordered by precedence.
-func (m *Table) Add(precedence int, assoc Assoc, tok ...token.Token) {
-	lhs, rhs := assoc.Level(precedence)
-	for _, t := range tok {
-		m.Lut[t] = Operator{Token: t, L: lhs, R: rhs}
-		m.Ord = append(m.Ord, m.Lut[t])
-	}
-}
-
-// Sort sorts the elements of Ord based on precedence, while preserving the
-// order of any elements with equal precedence.
-// Sort does not read or modify Lut.
-//
-// Should be called only once after all elements have been added to the table
-// via method Add.
-func (m *Table) Sort() { sort.Stable(m) }
-
-// Len is the number of elements in the collection.
-func (m *Table) Len() int { return len(m.Ord) }
-
-// Less reports whether the element with index i
-// must sort before the element with index j.
-//
-// If both Less(i, j) and Less(j, i) are false,
-// then the elements at index i and j are considered equal.
-// Sort may place equal elements in any order in the final result,
-// while Stable preserves the original input order of equal elements.
-//
-// Less must describe a transitive ordering:
-//   - if both Less(i, j) and Less(j, k) are true,
-//     then Less(i, k) must be true as well.
-//   - if both Less(i, j) and Less(j, k) are false,
-//     then Less(i, k) must be false as well.
-//
-// Note that floating-point comparison (operator < on float32/float64 values)
-// is not a transitive ordering when not-a-number (NaN) values are involved.
-// See Float64Slice.Less for a correct implementation for floating-point values.
-func (m *Table) Less(i, j int) bool {
-	return m.Ord[i].Precedence() > m.Ord[j].Precedence()
-}
-
-// Swap swaps the elements with indexes i and j.
-func (m *Table) Swap(i, j int) {
-	o := m.Ord[i]
-	m.Ord[i] = m.Ord[j]
-	m.Ord[j] = o
-}
+var Default Schema
