@@ -34,8 +34,7 @@ func comparer() cmp.Option { return cmp.Comparer(cmpStack) }
 
 type strNode string
 
-func (s strNode) String() string     { return string(s) }
-func (s strNode) Equals(a Node) bool { return s.String() == a.String() }
+func (s strNode) String() string { return string(s) }
 
 func Test_Stack_Push(t *testing.T) {
 	for name, tt := range map[string]struct {

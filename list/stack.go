@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+// Node defines the interface for elements of a [Stack].
+type Node interface {
+	String() string
+}
+
 // Stack represents a last-in, first-out (LIFO) data structure composed of
 // [Node] elements. The zero value is ready to be used.
 type Stack struct {
@@ -18,13 +23,16 @@ func (s *Stack) Len() int {
 	return int(s.len)
 }
 
-// Push adds a new element to the top of the stack.
+// Push adds new elements to the top of the stack.
 //
-// Nil elements are ignored and will not be added.
-func (s *Stack) Push(a Node) {
-	if a != nil && s.len < maxLen {
-		s.top = &singly{Node: a, next: s.top}
-		s.len++
+// Nil elements are ignored and will not be added, and no other elements will be
+// added after the first nil encountered.
+func (s *Stack) Push(a ...Node) {
+	for _, t := range a {
+		if t != nil && s.len < maxLen {
+			s.top = &singly{Node: t, next: s.top}
+			s.len++
+		}
 	}
 }
 

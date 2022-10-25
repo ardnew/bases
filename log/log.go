@@ -10,30 +10,30 @@ import (
 	"time"
 )
 
-// FmtSpec represents a printf-style format specifier ('%'-escaped rune).
+// FormatSpec represents a printf-style format specifier ('%'-escaped rune).
 //
 // No padding or width arguments are supported. The specifiers are simply
 // text replacement tokens performed in a single scan of the format string.
-type FmtSpec rune
+type FormatSpec rune
 
 const (
-	Message  FmtSpec = 's' // The actual log message
-	Date     FmtSpec = 'd' // The date in the local time zone: 2009/01/23
-	Time     FmtSpec = 't' // The time in the local time zone: 01:23:23
-	Micros   FmtSpec = 'u' // Same as Time (to microseconds): 01:23:23.123123
-	FilePath FmtSpec = 'F' // Full file path: /path/to/file/name.go
-	FileBase FmtSpec = 'f' // Base file name: name.go
-	Line     FmtSpec = 'n' // Line number: 23
+	Message  FormatSpec = 's' // The actual log message
+	Date     FormatSpec = 'd' // The date in the local time zone: 2009/01/23
+	Time     FormatSpec = 't' // The time in the local time zone: 01:23:23
+	Micros   FormatSpec = 'u' // Same as Time (to microseconds): 01:23:23.123123
+	FilePath FormatSpec = 'F' // Full file path: /path/to/file/name.go
+	FileBase FormatSpec = 'f' // Base file name: name.go
+	Line     FormatSpec = 'n' // Line number: 23
 )
 
-var FmtDefault = "%d %t ┆ %f:%n ┆ %s"
+var DefaultFormat = "%d %t ┆ %f:%n ┆ %s"
 
 // A Log represents an active logging object that generates lines of output to
-// an io.Writer. Each logging operation makes a single call to the Writer's
-// Write method. A Logger can be used simultaneously from multiple goroutines;
-// it guarantees to serialize access to the Writer.
+// an [io.Writer]. Each logging operation makes a single call to the method
+// [io.Writer.Write]. A Logger can be used simultaneously from multiple
+// goroutines; it guarantees to serialize access to the Writer.
 type Log struct {
-	mu  sync.Mutex // Ensures atomic writes; protects the following fields
+	mut sync.Mutex // Ensures atomic writes; protects the following fields
 	fmt []rune     // Output format
 	out io.Writer  // Destination for output
 	buf []byte     // For accumulating text to write
@@ -43,12 +43,53 @@ type Log struct {
 // New creates a new Log. The out variable sets the destination to which log
 // data will be written. The format of the log message is defined via fmt which
 // contains printf-style specifiers ('%'-escaped runes).
-func New(out io.Writer, fmt string) *Log {
-	l := &Log{out: out, fmt: []rune(fmt)}
-	if out == io.Discard {
+func New(output io.Writer, format string) *Log {
+	l := &Log{out: output, fmt: []rune(format)}
+	if output == io.Discard {
 		l.nul = 1
 	}
 	return l
+}
+
+// Writer returns the output destination for the Log.
+func (l *Log) Writer() io.Writer {
+	l.mut.Lock()
+	defer l.mut.Unlock()
+	return l.out
+}
+
+// SetWriter sets the output destination for the Log.
+func (l *Log) SetWriter(w io.Writer) {
+	l.mut.Lock()
+	defer l.mut.Unlock()
+	l.out = w
+	var nul int32
+	if w == io.Discard {
+		nul = 1
+	}
+	atomic.StoreInt32(&l.nul, nul)
+}
+
+// Format returns the printf-style format string that describes the order and
+// content of log messages.
+//
+// See type [FormatSpec] for available specifiers and see const [DefaultFormat]
+// for an example.
+func (l *Log) Format() string {
+	l.mut.Lock()
+	defer l.mut.Unlock()
+	return string(l.fmt)
+}
+
+// SetFormat sets the printf-style format string that describes the order and
+// content of log messages.
+//
+// See type [FormatSpec] for available specifiers and see const [DefaultFormat]
+// for an example.
+func (l *Log) SetFormat(format string) {
+	l.mut.Lock()
+	defer l.mut.Unlock()
+	l.fmt = []rune(format)
 }
 
 // Output writes the output for a logging event.
@@ -59,8 +100,8 @@ func (l *Log) Output(calldepth int, s string) error {
 	return err
 }
 
-// Printf calls l.Output to print to the logger.
-// Arguments are handled in the manner of fmt.Printf.
+// Printf calls method Output for writing to the Log.
+// Arguments are handled in the manner of [fmt.Printf].
 func (l *Log) Printf(format string, v ...any) {
 	if atomic.LoadInt32(&l.nul) != 0 {
 		return
@@ -68,8 +109,8 @@ func (l *Log) Printf(format string, v ...any) {
 	l.Output(2, fmt.Sprintf(format, v...))
 }
 
-// Print calls l.Output to print to the logger.
-// Arguments are handled in the manner of fmt.Print.
+// Print calls method Output for writing to the Log.
+// Arguments are handled in the manner of [fmt.Print].
 func (l *Log) Print(v ...any) {
 	if atomic.LoadInt32(&l.nul) != 0 {
 		return
@@ -77,8 +118,8 @@ func (l *Log) Print(v ...any) {
 	l.Output(2, fmt.Sprint(v...))
 }
 
-// Println calls l.Output to print to the logger.
-// Arguments are handled in the manner of fmt.Println.
+// Println calls method Output for writing to the Log.
+// Arguments are handled in the manner of [fmt.Println].
 func (l *Log) Println(v ...any) {
 	if atomic.LoadInt32(&l.nul) != 0 {
 		return
@@ -86,39 +127,39 @@ func (l *Log) Println(v ...any) {
 	l.Output(2, fmt.Sprintln(v...))
 }
 
-// Fatal is equivalent to l.Print() followed by a call to os.Exit(1).
+// Fatal is equivalent to Print followed by a call to [os.Exit] (code=1).
 func (l *Log) Fatal(v ...any) {
 	l.Output(2, fmt.Sprint(v...))
 	os.Exit(1)
 }
 
-// Fatalf is equivalent to l.Printf() followed by a call to os.Exit(1).
+// Fatalf is equivalent to Printf followed by a call to [os.Exit] (code=1).
 func (l *Log) Fatalf(format string, v ...any) {
 	l.Output(2, fmt.Sprintf(format, v...))
 	os.Exit(1)
 }
 
-// Fatalln is equivalent to l.Println() followed by a call to os.Exit(1).
+// Fatalln is equivalent to Println followed by a call to [os.Exit] (code=1).
 func (l *Log) Fatalln(v ...any) {
 	l.Output(2, fmt.Sprintln(v...))
 	os.Exit(1)
 }
 
-// Panic is equivalent to l.Print() followed by a call to panic().
+// Panic is equivalent to Print followed by a call to [panic].
 func (l *Log) Panic(v ...any) {
 	s := fmt.Sprint(v...)
 	l.Output(2, s)
 	panic(s)
 }
 
-// Panicf is equivalent to l.Printf() followed by a call to panic().
+// Panicf is equivalent to Printf followed by a call to [panic].
 func (l *Log) Panicf(format string, v ...any) {
 	s := fmt.Sprintf(format, v...)
 	l.Output(2, s)
 	panic(s)
 }
 
-// Panicln is equivalent to l.Println() followed by a call to panic().
+// Panicln is equivalent to Println followed by a call to [panic].
 func (l *Log) Panicln(v ...any) {
 	s := fmt.Sprintln(v...)
 	l.Output(2, s)
@@ -127,20 +168,20 @@ func (l *Log) Panicln(v ...any) {
 
 // Cheap integer to fixed-width decimal ASCII. Give a negative width to avoid
 // zero-padding.
-func itoa(buf *[]byte, i int, wid int) {
+func itoa(buf *[]byte, i int, width int) {
 	// Assemble decimal in reverse order.
 	var b [20]byte
-	bp := len(b) - 1
-	for i >= 10 || wid > 1 {
-		wid--
+	offset := len(b) - 1
+	for i >= 10 || width > 1 {
+		width--
 		q := i / 10
-		b[bp] = byte('0' + i - q*10)
-		bp--
+		b[offset] = byte('0' + i - q*10)
+		offset--
 		i = q
 	}
 	// i < 10
-	b[bp] = byte('0' + i)
-	*buf = append(*buf, b[bp:]...)
+	b[offset] = byte('0' + i)
+	*buf = append(*buf, b[offset:]...)
 }
 
 // specArgs encapsulates the set of all potentially-used arguments by any given
@@ -165,7 +206,7 @@ type specArgs struct {
 // b.) it is an output parameter — not an input argument controlling format.
 type specFunc func(out *[]byte, a specArgs)
 
-var spec = map[FmtSpec]func(out *[]byte, a specArgs){
+var spec = map[FormatSpec]func(out *[]byte, a specArgs){
 	Message: func(out *[]byte, a specArgs) {
 		*out = append(*out, a.mesg...)
 	},
@@ -219,25 +260,25 @@ var spec = map[FmtSpec]func(out *[]byte, a specArgs){
 // corresponding values.
 func (l *Log) format(calldepth int, message string) {
 	now, line := time.Now(), -1
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.mut.Lock()
+	defer l.mut.Unlock()
 	var file string
 	l.buf = l.buf[:0]
 	for i := 0; i < len(l.fmt)-1; i++ {
 		if l.fmt[i] == '%' {
 			i++
-			if f, ok := spec[FmtSpec(l.fmt[i])]; ok {
+			if f, ok := spec[FormatSpec(l.fmt[i])]; ok {
 				if line < 0 { // runtime callstack has never been retrieved
-					if FmtSpec(l.fmt[i]) == FileBase ||
-						FmtSpec(l.fmt[i]) == FilePath {
+					if FormatSpec(l.fmt[i]) == FileBase ||
+						FormatSpec(l.fmt[i]) == FilePath {
 						// release lock while getting caller info - it's expensive.
-						l.mu.Unlock()
+						l.mut.Unlock()
 						var ok bool
 						if _, file, line, ok = runtime.Caller(calldepth); !ok {
 							file = "???"
 							line = 0
 						}
-						l.mu.Lock()
+						l.mut.Lock()
 					}
 				}
 				f(&l.buf, specArgs{mesg: message, time: now, file: file, line: line})

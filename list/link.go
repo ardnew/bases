@@ -2,11 +2,6 @@ package list
 
 import "strings"
 
-type Node interface {
-	String() string
-	Equals(a Node) bool
-}
-
 // singly represents a singly-linked list composed of Node elements.
 type singly struct {
 	next *singly

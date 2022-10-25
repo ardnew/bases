@@ -13,7 +13,7 @@ type eval struct {
 
 func EvalString(s string) error {
 	e := eval{
-		Parser: expr.Expr(""),
+		Parser: expr.SExpr(""),
 		Scan:   scan.NewScan().Init([]byte(s)),
 	}
 	for e.Parser != nil {

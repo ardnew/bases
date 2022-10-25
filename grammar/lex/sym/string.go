@@ -1,41 +1,42 @@
-package atom
+package sym
 
 import (
 	"go/token"
 	"strings"
 )
 
-type Stream chan Atom
-
-type Atom struct {
-	Lit string
-	token.Token
-	token.Pos
-}
-
-func (a Atom) IsEOF() bool   { return a.Token == token.EOF }
-func (a Atom) IsLegal() bool { return a.Token != token.ILLEGAL }
-
-func (a Atom) String() string {
+func (a Symbol) String() string {
 	if a.IsLiteral() {
 		return a.Lit
 	}
 	return a.Token.String()
 }
 
-func (a Atom) QQ() string { return a.enquote('"', '"') }
-func (a Atom) Q() string  { return a.enquote('\'', '\'') }
-func (a Atom) R() string  { return a.enquote('`', '`') }
+// # Quoting methods of Symbol
+func (a Symbol) QQ() string { return a.enquote('"', '"') }
+func (a Symbol) Q() string  { return a.enquote('\'', '\'') }
+func (a Symbol) R() string  { return a.enquote('`', '`') }
 
-func (a Atom) enquote(lhs, rhs rune) string {
+func (a Symbol) isQuote(u rune) bool {
+	switch a.Token {
+	case token.CHAR:
+		return u == '\''
+	case token.STRING:
+		return u == '"' || u == '`'
+	default:
+		return false
+	}
+}
+
+func (a Symbol) enquote(lhs, rhs rune) string {
 	if !a.IsLiteral() || len(a.Lit) == 0 {
 		return enquote(a.Token, lhs, rhs)
 	}
 	// Surround literals with a pair of braces
-	lhl, rhl := '{', '}'
+	lhl, rhl := '«', '»'
 	if lhs == lhl && rhs == rhl {
 		// Fallback if our braces are the same as the quotes
-		lhl, rhl = '<', '>'
+		lhl, rhl = '←', '→'
 	}
 	var b strings.Builder
 	b.WriteRune(lhl)
@@ -59,20 +60,9 @@ func (a Atom) enquote(lhs, rhs rune) string {
 	return b.String()
 }
 
-func (a Atom) isQuote(u rune) bool {
-	switch a.Token {
-	case token.CHAR:
-		return u == '\''
-	case token.STRING:
-		return u == '"' || u == '`'
-	default:
-		return false
-	}
-}
-
-func QQ(tok token.Token) string { return Atom{Token: tok}.QQ() }
-func Q(tok token.Token) string  { return Atom{Token: tok}.Q() }
-func R(tok token.Token) string  { return Atom{Token: tok}.R() }
+func QQ(tok token.Token) string { return Symbol{Token: tok}.QQ() }
+func Q(tok token.Token) string  { return Symbol{Token: tok}.Q() }
+func R(tok token.Token) string  { return Symbol{Token: tok}.R() }
 
 func enquote(tok token.Token, lhs, rhs rune) string {
 	var b strings.Builder
