@@ -4,13 +4,26 @@ import (
 	"go/token"
 	"strings"
 
-	"github.com/ardnew/bases/grammar/lex"
-	"github.com/ardnew/bases/grammar/lex/sym"
-	"github.com/ardnew/bases/grammar/parse/op"
+	"github.com/ardnew/bases/lang/lex"
+	"github.com/ardnew/bases/lang/lex/sym"
+	"github.com/ardnew/bases/lang/parse/op"
 )
 
 type E interface {
 	String() string
+}
+
+func wrap(s sym.Symbol) E {
+	switch {
+	case s.IsIllegal(), s.IsEOF():
+		return &Edge{s}
+	case s.IsIdentifier(), s.IsLiteral():
+		return &Term{s}
+	case s.IsKeyword():
+		return &Word{s}
+	default:
+		// an operator
+	}
 }
 
 // func climb(lexer lex.Lexer, level op.Level) (e E) {
@@ -45,7 +58,15 @@ type Expr struct {
 	Op op.Operator
 }
 
+type Edge struct {
+	sym.Symbol
+}
+
 type Term struct {
+	sym.Symbol
+}
+
+type Word struct {
 	sym.Symbol
 }
 
@@ -102,4 +123,8 @@ func (s *Expr) String() string {
 
 func (t *Term) String() string {
 	return t.Symbol.String()
+}
+
+func (s *Sign) String() string {
+	return s.Symbol.String()
 }

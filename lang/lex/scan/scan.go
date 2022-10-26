@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ardnew/bases/grammar/lex/sym"
+	"github.com/ardnew/bases/lang/lex/sym"
 	"github.com/ardnew/bases/list"
 	"github.com/ardnew/bases/log"
 )
