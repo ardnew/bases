@@ -2,20 +2,26 @@ package op
 
 import (
 	"go/token"
+
+	"github.com/ardnew/bases/lang/lex/sym"
 )
 
 // Operator provides an abstraction for any type of operator in prefix, postfix,
 // infix, or other complex expressions.
 type Operator struct {
 	lbl, rbl Level
+	sym      sym.Symbol
 	prc      int
 	ass      Assoc
-	tok      token.Token
 }
 
 func (o Operator) Level() (Level, Level) { return o.lbl, o.rbl }
-func (o Operator) Token() token.Token    { return o.tok }
-func (o Operator) String() string        { return o.tok.String() }
+func (o Operator) Symbol() sym.Symbol    { return o.sym }
+func (o Operator) String() string        { return o.sym.String() }
+
+func Wrap(sym sym.Symbol) Operator {
+	return Operator{sym: sym}
+}
 
 type operators [maxOperators]Operator
 
@@ -26,9 +32,13 @@ func (p *operators) get(tok token.Token) (op Operator, ok bool) {
 	return
 }
 
-func (p *operators) add(prec int, assoc Assoc, tok ...token.Token) {
-	lhs, rhs := assoc.Level(prec)
+func (p *operators) add(prc int, ass Assoc, tok ...token.Token) {
+	lhs, rhs := ass.Level(prc)
 	for _, t := range tok {
-		p[t] = Operator{lbl: lhs, rbl: rhs, prc: prec, ass: assoc, tok: t}
+		p[t] = Operator{
+			lbl: lhs, rbl: rhs,
+			sym: sym.Operator(t),
+			prc: prc, ass: ass,
+		}
 	}
 }

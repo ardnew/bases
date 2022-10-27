@@ -8,7 +8,8 @@ package op
 type Assoc int
 
 const (
-	UnaryLeft Assoc = iota
+	Nonassociative Assoc = iota
+	UnaryLeft
 	UnaryRight
 	BinaryLeft
 	BinaryRight

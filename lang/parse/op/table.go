@@ -10,6 +10,14 @@ type Table struct {
 
 var Default Table
 
+var getDefault = [assocCount]func(token.Token) (Operator, bool){
+	nil,             // Nonassociative
+	Default.Postfix, // UnaryLeft
+	Default.Prefix,  // UnaryRight
+	Default.Infix,   // BinaryLeft
+	Default.Infix,   // BinaryRight
+}
+
 func (t *Table) Prefix(tok token.Token) (Operator, bool) {
 	return t.prefix.get(tok)
 }
@@ -20,6 +28,17 @@ func (t *Table) Postfix(tok token.Token) (Operator, bool) {
 
 func (t *Table) Infix(tok token.Token) (Operator, bool) {
 	return t.infix.get(tok)
+}
+
+func (t *Table) Get(tok token.Token, assoc ...Assoc) (op Operator, ok bool) {
+	for _, ass := range assoc {
+		if Nonassociative < ass && ass < assocCount {
+			if op, ok = getDefault[ass](tok); ok {
+				break
+			}
+		}
+	}
+	return
 }
 
 func (s *Table) Reset() {

@@ -70,8 +70,8 @@ func (l *Log) SetWriter(w io.Writer) {
 	atomic.StoreInt32(&l.nul, nul)
 }
 
-// Format returns the printf-style format string that describes the order and
-// content of log messages.
+// Format returns the printf-style format string that describes the structure
+// and content of log messages.
 //
 // See type [FormatSpec] for available specifiers and see const [DefaultFormat]
 // for an example.
@@ -81,8 +81,8 @@ func (l *Log) Format() string {
 	return string(l.fmt)
 }
 
-// SetFormat sets the printf-style format string that describes the order and
-// content of log messages.
+// SetFormat sets the printf-style format string that describes the structure
+// and content of log messages.
 //
 // See type [FormatSpec] for available specifiers and see const [DefaultFormat]
 // for an example.

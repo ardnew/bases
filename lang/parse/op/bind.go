@@ -3,8 +3,8 @@ package op
 // Level represents the binding level between one operator and one operand.
 //
 // Precedence and associativity are encoded together as a single integer
-// referred to throughout the io/syntax/* packages as a "binding level", or
-// just "level". This binding level metric is constructed as follows:
+// referred to throughout theese packages as a "binding level", or just "level".
+// This binding level metric is constructed as follows:
 //
 // Every Operator has two binding levels — one level between the Operator and
 // the operand on each side — left-hand side (LHS) and right-hand side (RHS).
@@ -24,9 +24,9 @@ package op
 // precedence number N > 0. The binding levels on either side of the operator
 // are then computed as 2×N and 2×N±1.
 //
-// Since all other Operators have levels M±1 != N±1, this difference in levels
-// on each side of the Operator only ever matters when we need a tiebreak among
-// equal Operators! This realizes the associativity relationship.
+// Since all other Operators have levels 2×M±1 != 2×N±1, this difference in
+// levels on each side of the Operator only ever matters when we need a tiebreak
+// among equal Operators! This realizes the associativity relationship.
 //
 // Parity selection depends on the particular parser being used. But for the
 // Pratt parser in this program, where increasing binding level corresponds to
