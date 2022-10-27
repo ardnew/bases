@@ -9,8 +9,8 @@ import (
 
 func TestEvalString(t *testing.T) {
 	for name, tc := range map[string]struct {
-		string
 		assertion assert.ErrorAssertionFunc
+		string
 	}{
 		// TODO: Add test cases.
 		// "literal": {

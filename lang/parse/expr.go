@@ -1,7 +1,6 @@
 package parse
 
 import (
-	"go/token"
 	"strings"
 
 	"github.com/ardnew/bases/lang/lex"
@@ -26,37 +25,37 @@ func wrap(s sym.Symbol) Expr {
 	}
 }
 
-func climb(lexer lex.Lexer, level op.Level) (expr Expr) {
+func climb(lexer lex.Lexer, _ op.Level) (expr Expr) {
 	e := wrap(lexer.Take())
-	switch x := e.(type) {
+	switch e.(type) {
 	case *Stop:
 	case *Term:
 	case *Ctrl:
 	case *Rule:
 	}
 
-	lhs := lexer.Take()
-	switch oper, prefix := op.Default.Prefix(lhs.Token); {
-	case prefix && oper.Token() == token.LPAREN:
-		e = climb(lexer, op.Unbound)
-		if !lexer.Check(sym.Token(token.RPAREN)) {
-			// unclosed paren
-		}
-	case prefix:
-		e = &Expr{Op: oper, E: []E{climb(lexer, oper.Right())}}
-	default:
-		e = &Term{lhs}
-	}
+	// lhs := lexer.Take()
+	// switch oper, prefix := op.Default.Prefix(lhs.Token); {
+	// case prefix && oper.Token() == token.LPAREN:
+	// 	e = climb(lexer, op.Unbound)
+	// 	if !lexer.Check(sym.Token(token.RPAREN)) {
+	// 		// unclosed paren
+	// 	}
+	// case prefix:
+	// 	e = &Expr{Op: oper, E: []E{climb(lexer, oper.Right())}}
+	// default:
+	// 	e = &Term{lhs}
+	// }
 
-	for {
-		if os := lexer.Look(); os.IsEOF() {
-		} else {
-			if oper, ok := op.Default.Postfix(os.Token); ok {
-				// e =
-			} else {
-			}
-		}
-	}
+	// for {
+	// 	if os := lexer.Look(); os.IsEOF() {
+	// 	} else {
+	// 		if oper, ok := op.Default.Postfix(os.Token); ok {
+	// 			// e =
+	// 		} else {
+	// 		}
+	// 	}
+	// }
 
 	return e
 }

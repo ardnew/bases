@@ -13,6 +13,7 @@ const (
 	UnaryRight
 	BinaryLeft
 	BinaryRight
+	assocCount
 )
 
 // Level returns the LHS and RHS binding levels of an s-associative operator
