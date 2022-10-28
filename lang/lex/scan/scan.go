@@ -89,7 +89,7 @@ func (s *Scan) Look() sym.Symbol {
 
 func (s *Scan) Check(a sym.Symbol) (ok bool) {
 	n := s.Take()
-	if ok = n.Matches(a); !ok {
+	if ok = n.Is(a); !ok {
 		s.Untake(n)
 	}
 	return

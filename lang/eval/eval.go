@@ -1,21 +1,25 @@
 package eval
 
 import (
+	"fmt"
+	"go/token"
+
 	"github.com/ardnew/bases/lang/lex/scan"
+	"github.com/ardnew/bases/lang/parse"
+	"github.com/ardnew/bases/lang/parse/op"
 )
 
 type eval struct {
 	*scan.Scan
 }
 
-func EvalString(_ string) error {
-	e := eval{}
-	return e.Scan
+func EvalString(s string) error {
+	e := eval{Scan: scan.New().Init([]byte(s))}
+	go e.Until(token.EOF, token.ILLEGAL)
+	return e.Parse()
 }
 
-//func (e *eval) Parse() error {
-//	for e.Parser != nil {
-//		e.Parser = e.Parser.Parse(e)
-//	}
-//	return e
-//}
+func (e *eval) Parse() error {
+	fmt.Printf("Expr = %s\n", parse.Climb(e, op.Unbound))
+	return e
+}

@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"go/token"
 	"strings"
 
 	"github.com/ardnew/bases/lang/lex"
@@ -11,6 +12,16 @@ import (
 type Expr interface {
 	String() string
 }
+
+type (
+	Rule struct {
+		E  []Expr
+		Op op.Operator
+	}
+	Stop struct{ sym.Symbol }
+	Term struct{ sym.Symbol }
+	Ctrl struct{ sym.Symbol }
+)
 
 func wrap(s sym.Symbol) Expr {
 	switch {
@@ -25,53 +36,51 @@ func wrap(s sym.Symbol) Expr {
 	}
 }
 
-func climb(lexer lex.Lexer, _ op.Level) (expr Expr) {
-	e := wrap(lexer.Take())
-	switch e.(type) {
-	case *Stop:
-	case *Term:
-	case *Ctrl:
+func Climb(lexer lex.Lexer, min op.Level) (expr Expr) {
+	s := lexer.Take()
+	l := wrap(s)
+	switch e := l.(type) {
+	case *Stop, *Term, *Ctrl:
 	case *Rule:
+		var prefix bool
+		switch e.Op, prefix = op.Default.Prefix(s.Token); {
+		case e.Op.Is(token.LPAREN):
+			l = Climb(lexer, op.Unbound)
+			if !lexer.Check(sym.Operator(token.RPAREN)) {
+				// unclosed paren
+			}
+		case prefix:
+			_, br := e.Op.Level()
+			e.E = append(e.E, Climb(lexer, br))
+		default:
+		}
+
 	}
 
-	// lhs := lexer.Take()
-	// switch oper, prefix := op.Default.Prefix(lhs.Token); {
-	// case prefix && oper.Token() == token.LPAREN:
-	// 	e = climb(lexer, op.Unbound)
-	// 	if !lexer.Check(sym.Token(token.RPAREN)) {
-	// 		// unclosed paren
-	// 	}
-	// case prefix:
-	// 	e = &Expr{Op: oper, E: []E{climb(lexer, oper.Right())}}
-	// default:
-	// 	e = &Term{lhs}
-	// }
+	for {
+		if os := lexer.Look(); os.IsEOF() {
+			break
+		} else {
+			if oper, ok := op.Default.Postfix(os.Token); ok {
+				bl, _ := oper.Level()
+				if bl.Int() < min.Int() {
+					break
+				}
+				lexer.Take()
+				l = newRule(os, l)
+				continue
+			} else {
+				lexer.Take()
+				break
+			}
+		}
+	}
 
-	// for {
-	// 	if os := lexer.Look(); os.IsEOF() {
-	// 	} else {
-	// 		if oper, ok := op.Default.Postfix(os.Token); ok {
-	// 			// e =
-	// 		} else {
-	// 		}
-	// 	}
-	// }
-
-	return e
+	return l
 }
 
-type (
-	Rule struct {
-		E  []Expr
-		Op op.Operator
-	}
-	Stop struct{ sym.Symbol }
-	Term struct{ sym.Symbol }
-	Ctrl struct{ sym.Symbol }
-)
-
-func newRule(s sym.Symbol) *Rule {
-	return &Rule{make([]Expr, 0, op.MaxArity), op.Wrap(s)}
+func newRule(s sym.Symbol, e ...Expr) *Rule {
+	return &Rule{append(make([]Expr, 0, op.MaxArity), e...), op.Wrap(s)}
 }
 
 // func (t *Rule) Parse(lexer lex.Lexer, level op.Level) Expr {
@@ -125,10 +134,14 @@ func (s *Rule) String() string {
 	return b.String()
 }
 
+func (s *Stop) String() string {
+	return s.Symbol.String()
+}
+
 func (t *Term) String() string {
 	return t.Symbol.String()
 }
 
-func (s *Stop) String() string {
-	return s.Symbol.String()
+func (t *Ctrl) String() string {
+	return t.Symbol.String()
 }

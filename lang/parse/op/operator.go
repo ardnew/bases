@@ -15,9 +15,10 @@ type Operator struct {
 	ass      Assoc
 }
 
-func (o Operator) Level() (Level, Level) { return o.lbl, o.rbl }
-func (o Operator) Symbol() sym.Symbol    { return o.sym }
-func (o Operator) String() string        { return o.sym.String() }
+func (o Operator) Level() (Level, Level)   { return o.lbl, o.rbl }
+func (o Operator) Symbol() sym.Symbol      { return o.sym }
+func (o Operator) Is(tok token.Token) bool { return o.sym.Token == tok }
+func (o Operator) String() string          { return o.sym.String() }
 
 func Wrap(sym sym.Symbol) Operator {
 	return Operator{sym: sym}

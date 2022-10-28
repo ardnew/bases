@@ -22,7 +22,7 @@ func TestEvalString(t *testing.T) {
 		// 	assertion: assert.NoError,
 		// },
 		"prefix": {
-			string:    "++2",
+			string:    "--(++2)",
 			assertion: assert.NoError,
 		},
 		// "postfix": {
