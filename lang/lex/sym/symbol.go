@@ -80,7 +80,7 @@ func (s Symbol) IsLiteral() bool {
 // Is returns true if s and t represent the same token without respect to
 // location; it returns false otherwise.
 //
-// In particular, s.Is(t) does not imply s.Pos == t.Pos.
+// In particular, a.Is(b) does not imply a.Pos == b.Pos.
 func (s Symbol) Is(t Symbol) bool {
 	return s.Token == t.Token && (!s.Token.IsLiteral() || s.Lit == t.Lit)
 }

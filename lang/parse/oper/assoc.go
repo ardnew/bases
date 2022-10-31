@@ -1,4 +1,4 @@
-package op
+package oper
 
 // Assoc represents an operator's associativity.
 //

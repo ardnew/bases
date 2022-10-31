@@ -1,4 +1,4 @@
-package op
+package oper
 
 // Level represents the binding level between one operator and one operand.
 //

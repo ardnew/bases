@@ -1,49 +1,57 @@
 package eval
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestEvalString(t *testing.T) {
-	for name, tc := range map[string]struct {
-		assertion assert.ErrorAssertionFunc
+	for _, tc := range []struct {
+		name string
 		string
+		rpn string
 	}{
 		// TODO: Add test cases.
-		// "literal": {
-		// 	string:    `"hello"`,
-		// 	assertion: assert.NoError,
-		// },
-		// "ident": {
-		// 	string:    "foo",
-		// 	assertion: assert.NoError,
-		// },
-		"prefix": {
-			string:    "--(++2)",
-			assertion: assert.NoError,
+		{
+			name:   "literal",
+			string: `"hello"`,
+			rpn:    `"hello"`,
 		},
-		// "postfix": {
-		// 	string:    "57--",
-		// 	assertion: assert.NoError,
-		// },
-		// "infix": {
-		// 	string:    "foo * 12.1",
-		// 	assertion: assert.NoError,
-		// },
-		// "order": {
-		// 	string:    "foo * 12.1 + 123 - 'r'",
-		// 	assertion: assert.NoError,
-		// },
-		// "wtfix": {
-		// 	string:    "1 + 3.14 + a-- * b & x[tt%7] | ^32 &^ ++a = ~a >> !foo - x",
-		// 	assertion: assert.NoError,
-		// },
+		{
+			name:   "ident",
+			string: `foo`,
+			rpn:    `foo`,
+		},
+		{
+			name:   "prefix",
+			string: `--(++2)`,
+			rpn:    `(--, (++, 2))`,
+		},
+		{
+			name:   "postfix",
+			string: `57--`,
+			rpn:    `(--, 57)`,
+		},
+		{
+			name:   "infix",
+			string: `foo * 12.1`,
+			rpn:    `(*, foo, 12.1)`,
+		},
+		{
+			name:   "order",
+			string: `foo - 12.1 * 123 + 'r' / "bar" || true`,
+			rpn:    `(||, (-, foo, (+, (*, 12.1, 123), (/, 'r', "bar"))), true)`,
+		},
+		//{
+		//name: "wtfix",
+		//string:    `1 + 3.14 + a-- * b & x[tt%7] | ^32 &^ ++a = ~a >> !foo - x`,
+		//rpn: ,
+		//},
 	} {
-		t.Run(name, func(t *testing.T) {
-			tc.assertion(t, EvalString(tc.string), fmt.Sprintf("EvalString(%v)", tc.string))
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.rpn, nil)
+			// tc.assertion(t, EvalString(tc.string), fmt.Sprintf("EvalString(%v)", tc.string))
 		})
 	}
 }

@@ -9,8 +9,8 @@ import (
 //
 // Conceptually, there are two driving processes:
 //
-//  1. Lexing tokens – generates indivisble grammar component (token) stream
-//  2. Parsing tokens – verifies/evaluates token stream's syntax and semantics
+//  1. Lexer – generates stream of indivisble grammar components (tokens)
+//  2. Parser – verifies/evaluates syntax and semantics of token stream
 //
 // Since each process may introduce overhead or latency independent of the other
 // process, they are good candidates for a concurrent design.

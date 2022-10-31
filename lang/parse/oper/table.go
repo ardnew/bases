@@ -1,4 +1,4 @@
-package op
+package oper
 
 import "go/token"
 
@@ -38,6 +38,11 @@ func (t *Table) Get(tok token.Token, assoc ...Assoc) (op Operator, ok bool) {
 			}
 		}
 	}
+	return
+}
+
+func (t *Table) IsDefined(tok token.Token) (ok bool) {
+	_, ok = t.Get(tok, UnaryLeft, UnaryRight, BinaryLeft, BinaryRight)
 	return
 }
 

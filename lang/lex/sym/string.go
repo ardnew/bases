@@ -6,7 +6,7 @@ import (
 )
 
 func (a Symbol) String() string {
-	if a.IsLiteral() {
+	if a.IsLiteral() || a.IsIdentifier() {
 		return a.Lit
 	}
 	return a.Token.String()
