@@ -26,7 +26,10 @@ const (
 	Line     FormatSpec = 'n' // Line number: 23
 )
 
-var DefaultFormat = "%d %t ┆ %f:%n ┆ %s"
+var (
+	DefaultWriter = os.Stderr
+	DefaultFormat = "%d %t ┆ %f:%n ┆ %s"
+)
 
 // A Log represents an active logging object that generates lines of output to
 // an [io.Writer]. Each logging operation makes a single call to the method

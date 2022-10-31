@@ -16,10 +16,7 @@ import (
 // process, they are good candidates for a concurrent design.
 type Lexer interface {
 	Take() sym.Symbol
-	TakeNext([]sym.Symbol) error
 	Untake(...sym.Symbol)
 	Look() sym.Symbol
-	Check(sym.Symbol) bool
-	Err() error
-	Error() string
+	error
 }

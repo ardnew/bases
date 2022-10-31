@@ -63,8 +63,8 @@ func Climb(lexer lex.Lexer, min oper.Level) (it item) {
 		switch e.Operator, prefix = oper.Default.Prefix(s.Token); {
 		case e.Spells(token.LPAREN):
 			l = Climb(lexer, oper.Unbound)
-			if !lexer.Check(sym.Operator(token.RPAREN)) {
-				// unclosed paren
+			if t := lexer.Take(); !t.Is(sym.Operator(token.RPAREN)) {
+				lexer.Untake(t)
 			}
 		case prefix:
 			_, br := e.Level()

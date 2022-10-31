@@ -3,7 +3,6 @@ package scan
 import (
 	"go/scanner"
 	"go/token"
-	"os"
 	"strings"
 
 	"github.com/ardnew/bases/lang/lex/sym"
@@ -16,6 +15,7 @@ import (
 type Scan struct {
 	log  *log.Log
 	fset *token.FileSet
+	stop chan interface{}
 	next sym.Stream
 	undo list.SyncStack
 	errs scanner.ErrorList
@@ -24,19 +24,34 @@ type Scan struct {
 
 // New creates a new Scan. Users must initialize the returned Scan object by
 // calling Init with the source bytes to tokenize.
-func New() *Scan {
-	return &Scan{
-		log:     log.New(os.Stderr, log.DefaultFormat),
-		fset:    token.NewFileSet(),
-		next:    make(sym.Stream),
-		Scanner: scanner.Scanner{},
+func New() *Scan { return (&Scan{}).Reset() }
+
+// Reset initializes all fields to their default state.
+//
+// All line information previously recorded in the internal file set is cleared
+// along with any errors generated when scanning it.
+//
+// The output channel and lookahead buffer are both flushed.
+func (s *Scan) Reset() *Scan {
+	if s == nil {
+		return New()
 	}
+	s.log = log.New(log.DefaultWriter, log.DefaultFormat)
+	s.fset = token.NewFileSet()
+	s.stop = make(chan interface{}, 1)
+	if s.next != nil {
+		close(s.next)
+	}
+	s.next = make(sym.Stream)
+	s.undo = list.SyncStack{}
+	s.errs.Reset()
+	s.Scanner = scanner.Scanner{}
+	return s
 }
 
-// Init initializes a Scan object by defining the source bytes to tokenize.
-func (s *Scan) Init(src []byte) *Scan {
+// Add appends a buffer to the scanner input.
+func (s *Scan) Add(src []byte) *Scan {
 	const mode = 0 // Use scanner.ScanComments to emit COMMENT tokens.
-	s.errs.Reset()
 	file := s.fset.AddFile("", -1, len(src))
 	s.Scanner.Init(file, src, s.addError, mode)
 	return s
@@ -68,13 +83,6 @@ func (s *Scan) Take() sym.Symbol {
 	return <-s.next
 }
 
-func (s *Scan) TakeNext(a []sym.Symbol) error {
-	for i := range a {
-		a[i] = s.Take()
-	}
-	return s.Err()
-}
-
 func (s *Scan) Untake(a ...sym.Symbol) {
 	for _, t := range a {
 		s.undo.Push(t)
@@ -87,12 +95,19 @@ func (s *Scan) Look() sym.Symbol {
 	return a
 }
 
-func (s *Scan) Check(a sym.Symbol) (ok bool) {
-	n := s.Take()
-	if ok = n.Is(a); !ok {
-		s.Untake(n)
+func (s *Scan) Error() (err string) {
+	if s.errs.Len() > 0 {
+		s.errs.RemoveMultiples()
+		err = s.errs.Error()
 	}
 	return
+}
+
+func (s *Scan) Err() (err error) {
+	if s.errs.Len() > 0 {
+		return s
+	}
+	return nil
 }
 
 func (s *Scan) Fail(a sym.Symbol, expect ...token.Token) {
@@ -122,21 +137,6 @@ func (s *Scan) Fail(a sym.Symbol, expect ...token.Token) {
 		b.WriteRune(')')
 	}
 	s.addError(s.fset.Position(a.Pos), b.String())
-}
-
-func (s *Scan) Err() (err error) {
-	if s.errs.Len() > 0 {
-		return s
-	}
-	return nil
-}
-
-func (s *Scan) Error() (err string) {
-	if s.errs.Len() > 0 {
-		s.errs.RemoveMultiples()
-		err = s.errs.Error()
-	}
-	return
 }
 
 func (s *Scan) addError(pos token.Position, msg string) {
