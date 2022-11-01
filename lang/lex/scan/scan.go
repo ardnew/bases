@@ -19,11 +19,9 @@ type Scan struct {
 	next sym.Stream
 	undo list.SyncStack
 	errs scanner.ErrorList
-	scanner.Scanner
 }
 
-// New creates a new Scan. Users must initialize the returned Scan object by
-// calling Init with the source bytes to tokenize.
+// New creates a new Scan.
 func New() *Scan { return (&Scan{}).Reset() }
 
 // Reset initializes all fields to their default state.
@@ -45,28 +43,30 @@ func (s *Scan) Reset() *Scan {
 	s.next = make(sym.Stream)
 	s.undo = list.SyncStack{}
 	s.errs.Reset()
-	s.Scanner = scanner.Scanner{}
 	return s
 }
 
-// Add appends a buffer to the scanner input.
-func (s *Scan) Add(src []byte) *Scan {
-	const mode = 0 // Use scanner.ScanComments to emit COMMENT tokens.
-	file := s.fset.AddFile("", -1, len(src))
-	s.Scanner.Init(file, src, s.addError, mode)
+// AddBuffer appends a buffer to the scanner input amd begins processing it
+// immediately in a new goroutine.
+func (s *Scan) AddBuffer(b []byte) error {
+	file := s.fset.AddFile("", -1, len(b))
+	go s.emit(file, b, token.ILLEGAL, token.EOF)
 	return s
 }
 
-// Until continuously scans tokens from the input source and sends them to the
+// emit continuously scans tokens from the input source and sends them to the
 // output channel.
 // It stops scanning after any given [token.Token] in eos is scanned and sent,
 // which should probably always include [token.ILLEGAL] and [token.EOF].
 //
-// Until is intended to be run in its own goroutine. This allows the lexer to
+// emit is intended to be run in its own goroutine. This allows the lexer to
 // proceed over the input while a parser concurrently processes the tokens.
-func (s *Scan) Until(eos ...token.Token) {
+func (s *Scan) emit(f *token.File, b []byte, eos ...token.Token) {
+	const mode = 0 // Use scanner.ScanComments to emit COMMENT tokens.
+	sc := &scanner.Scanner{}
+	sc.Init(f, b, s.addError, mode)
 	for {
-		pos, tok, lit := s.Scan()
+		pos, tok, lit := sc.Scan()
 		s.next <- sym.Symbol{Lit: lit, Token: tok, Pos: pos}
 		for _, e := range eos {
 			if tok == e {
