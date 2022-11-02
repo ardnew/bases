@@ -4,9 +4,6 @@ import (
 	"go/token"
 )
 
-// Stream represents a stream of Symbols.
-type Stream chan Symbol
-
 // Symbol is a [token.Token] represented by a string at position [token.Pos].
 type Symbol struct {
 	Lit string
