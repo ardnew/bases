@@ -1,13 +1,11 @@
 package expr
 
 import (
-	"go/token"
 	"io"
 	"strings"
 
-	"github.com/ardnew/bases/lang/lex"
-	"github.com/ardnew/bases/lang/lex/sym"
 	"github.com/ardnew/bases/lang/parse/oper"
+	"github.com/ardnew/bases/lang/parse/sym"
 )
 
 // Expr represents an expression tree.
@@ -53,48 +51,48 @@ func wrap(s sym.Symbol) item {
 	}
 }
 
-func Climb(lexer lex.Lexer, min oper.Level) (it item) {
-	s := lexer.Take()
-	l := wrap(s)
-	switch e := l.(type) {
-	case *stop, *term, *ctrl:
-	case *rule:
-		var prefix bool
-		switch e.Operator, prefix = oper.Default.Prefix(s.Token); {
-		case e.Spells(token.LPAREN):
-			l = Climb(lexer, oper.Unbound)
-			if t := lexer.Take(); !t.Is(sym.Operator(token.RPAREN)) {
-				lexer.Untake(t)
-			}
-		case prefix:
-			_, br := e.Level()
-			e.arg = append(e.arg, Climb(lexer, br))
-		default:
-		}
+// func Climb(stream sym.Stream, min oper.Level) (it item) {
+// 	s := lexer.Take()
+// 	l := wrap(s)
+// 	switch e := l.(type) {
+// 	case *stop, *term, *ctrl:
+// 	case *rule:
+// 		var prefix bool
+// 		switch e.Operator, prefix = oper.Default.Prefix(s.Token); {
+// 		case e.Spells(token.LPAREN):
+// 			l = Climb(lexer, oper.Unbound)
+// 			if t := lexer.Take(); !t.Is(sym.Operator(token.RPAREN)) {
+// 				lexer.Untake(t)
+// 			}
+// 		case prefix:
+// 			_, br := e.Level()
+// 			e.arg = append(e.arg, Climb(lexer, br))
+// 		default:
+// 		}
 
-	}
+// 	}
 
-	for {
-		if os := lexer.Look(); os.IsEOF() {
-			break
-		} else {
-			if op, ok := oper.Default.Postfix(os.Token); ok {
-				bl, _ := op.Level()
-				if bl.Int() < min.Int() {
-					break
-				}
-				lexer.Take()
-				l = newRule(os, l)
-				continue
-			} else {
-				lexer.Take()
-				break
-			}
-		}
-	}
+// 	for {
+// 		if os := lexer.Look(); os.IsEOF() {
+// 			break
+// 		} else {
+// 			if op, ok := oper.Default.Postfix(os.Token); ok {
+// 				bl, _ := op.Level()
+// 				if bl.Int() < min.Int() {
+// 					break
+// 				}
+// 				lexer.Take()
+// 				l = newRule(os, l)
+// 				continue
+// 			} else {
+// 				lexer.Take()
+// 				break
+// 			}
+// 		}
+// 	}
 
-	return l
-}
+// 	return l
+// }
 
 func newRule(s sym.Symbol, it ...item) *rule {
 	return &rule{

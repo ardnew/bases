@@ -13,13 +13,13 @@ import (
 // Stream can be considered a "state function" as described by Rob Pike in
 // [Lexical Scanning in Go] (GTUG Sydney; 30 August 2011).
 //
-// The stateful properties of Stream are captured by a closure returned by Make.
+// The stateful properties of Stream are captured by a closure returned by Emit.
 //
 // [Lexical Scanning in Go]: https://go.dev/talks/2011/lex.slide#19
 type Stream func(chan Symbol) Stream
 
-// Make initializes and returns a Stream ready to tokenize a given input buffer.
-func Make(buffer []byte) (stream Stream) {
+// Emit initializes and returns a Stream ready to tokenize a given input buffer.
+func Emit(buffer []byte) (stream Stream) {
 	// Use mode = scanner.ScanComments to emit COMMENT tokens.
 	const mode scanner.Mode = 0
 
@@ -27,7 +27,7 @@ func Make(buffer []byte) (stream Stream) {
 	errs := &scanner.ErrorList{}
 	slog := log.New(log.DefaultWriter, log.DefaultFormat)
 
-	// The input buffer given with each call to Make represents the entire input
+	// The input buffer given with each call to Emit represents the entire input
 	// being scanned.
 	// No additional input may be appended.
 	scan.Init(
@@ -47,6 +47,7 @@ func Make(buffer []byte) (stream Stream) {
 		pos, tok, lit := scan.Scan()
 		s := Symbol{Token: tok, Lit: lit, Pos: pos}
 		c <- s
+		c <- Symbol{}
 		if s.IsEOF() || s.IsIllegal() {
 			return nil
 		}
@@ -57,10 +58,10 @@ func Make(buffer []byte) (stream Stream) {
 
 // Undo returns a Stream that outputs the given Symbol without scanning input.
 //
-// The return value when calling the function returned from Undo is the receiver
-// of Undo.
-// This relationship allows for unlimited nesting, which means unlimited
-// lookahead.
+// Calling the Stream result will return the receiver of Undo. This relationship
+// allows for unlimited nesting, which means unlimited lookahead. For example:
+//
+//	...
 func (e Stream) Undo(s Symbol) Stream {
 	return func(c chan Symbol) Stream {
 		c <- s

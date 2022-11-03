@@ -3,7 +3,7 @@ package oper
 import (
 	"go/token"
 
-	"github.com/ardnew/bases/lang/lex/sym"
+	"github.com/ardnew/bases/lang/parse/sym"
 )
 
 // Operator provides an abstraction for any type of operator in prefix, postfix,

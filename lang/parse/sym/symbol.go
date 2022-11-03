@@ -81,3 +81,11 @@ func (s Symbol) IsLiteral() bool {
 func (s Symbol) Is(t Symbol) bool {
 	return s.Token == t.Token && (!s.Token.IsLiteral() || s.Lit == t.Lit)
 }
+
+// String returns a Symbol's literal string representation.
+func (a Symbol) String() string {
+	if a.IsLiteral() || a.IsIdentifier() {
+		return a.Lit
+	}
+	return a.Token.String()
+}
