@@ -47,7 +47,6 @@ func Emit(buffer []byte) (stream Stream) {
 		pos, tok, lit := scan.Scan()
 		s := Symbol{Token: tok, Lit: lit, Pos: pos}
 		c <- s
-		c <- Symbol{}
 		if s.IsEOF() || s.IsIllegal() {
 			return nil
 		}
