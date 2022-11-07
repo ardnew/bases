@@ -24,10 +24,10 @@ func Wrap(sym sym.Symbol) Operator {
 	return Operator{sym: sym}
 }
 
-type operators [maxOperators]Operator
+type operators [MaxOperators]Operator
 
 func (p *operators) get(tok token.Token) (op Operator, ok bool) {
-	if 0 <= int(tok) && int(tok) < maxOperators {
+	if 0 <= int(tok) && int(tok) < MaxOperators {
 		op, ok = p[tok], (p[tok].lbl != Unbound) || (p[tok].rbl != Unbound)
 	}
 	return

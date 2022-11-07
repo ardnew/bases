@@ -1,6 +1,6 @@
 package num
 
-// Exported package constants defining capability limits.
+// Exported capability limits
 const (
-	BITS_MAX = 64
+	MaxBits = 64
 )

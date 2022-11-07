@@ -29,7 +29,7 @@ func (s *Stack) Len() int {
 // added after the first nil encountered.
 func (s *Stack) Push(a ...Node) {
 	for _, t := range a {
-		if t != nil && s.len < maxLen {
+		if t != nil && s.len < MaxLen {
 			s.top = &singly{Node: t, next: s.top}
 			s.len++
 		}

@@ -11,11 +11,15 @@ type Table struct {
 var Default Table
 
 var getDefault = [assocCount]func(token.Token) (Operator, bool){
-	nil,             // Nonassociative
+	undef,           // Nonassociative
 	Default.Postfix, // UnaryLeft
 	Default.Prefix,  // UnaryRight
 	Default.Infix,   // BinaryLeft
 	Default.Infix,   // BinaryRight
+}
+
+func undef(token.Token) (Operator, bool) {
+	return Operator{}, false
 }
 
 func (t *Table) Prefix(tok token.Token) (Operator, bool) {

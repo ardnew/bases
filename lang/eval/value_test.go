@@ -1,6 +1,8 @@
 package eval
 
 import (
+	"io"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -50,8 +52,9 @@ func TestEvalString(t *testing.T) {
 		//},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.rpn, nil)
-			// tc.assertion(t, EvalString(tc.string), fmt.Sprintf("EvalString(%v)", tc.string))
+			val := New()
+			io.Copy(val, strings.NewReader(tc.string))
+			assert.Equal(t, tc.rpn, val.String())
 		})
 	}
 }

@@ -38,8 +38,8 @@ type RowBits int
 
 const Byte, Word, Long RowBits = 8, 16, 32
 
-func (b RowBits) maxOffset() int { return num.BITS_MAX - int(b) }
-func (b RowBits) maxRow() int    { return num.BITS_MAX / int(b) }
+func (b RowBits) maxOffset() int { return num.MaxBits - int(b) }
+func (b RowBits) maxRow() int    { return num.MaxBits / int(b) }
 
 type table struct {
 	*tview.Table

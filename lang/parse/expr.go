@@ -1,6 +1,7 @@
-package expr
+package parse
 
 import (
+	"errors"
 	"io"
 	"strings"
 
@@ -8,11 +9,17 @@ import (
 	"github.com/ardnew/bases/lang/parse/sym"
 )
 
+var ErrInvalidExpr = errors.New("invalid expression")
+
 // Expr represents an expression tree.
-type Expr struct{ item }
+type Expr struct {
+	item
+	stream sym.Streamer
+	symbol chan sym.Symbol
+}
 
 func New() *Expr {
-	return &Expr{}
+	return &Expr{symbol: make(chan sym.Symbol)}
 }
 
 func (e *Expr) Parse(r io.Reader) (n int64, err error) {
@@ -20,11 +27,25 @@ func (e *Expr) Parse(r io.Reader) (n int64, err error) {
 }
 
 func (e *Expr) ParseBuffer(b []byte) (n int64, err error) {
+	e.stream = sym.Stream(b)
+	go func(s sym.Streamer, c chan sym.Symbol) {
+		for {
+			s = s(c)
+		}
+	}(e.stream, e.symbol)
+
 	return
 }
 
 func (e *Expr) ParseString(s string) (n int64, err error) {
 	return
+}
+
+func (e *Expr) Err() error {
+	if e == nil || e.item == nil {
+		return ErrInvalidExpr
+	}
+	return nil
 }
 
 type (

@@ -7,19 +7,26 @@ import (
 	"github.com/ardnew/bases/log"
 )
 
-// Stream scans and sends the current input [Symbol] to the given channel and
-// returns a Stream that will repeat this process on the next input Symbol.
+// Sync contains the various channels and locks for coordinating goroutines
+// related to Streamer.
+type Sync struct {
+	Output chan Symbol
+}
+
+// Streamer scans and sends the current input [Symbol] to the given channel and
+// returns a Streamer that will repeat this process on the next input Symbol.
 //
-// Stream can be considered a "state function" as described by Rob Pike in
+// Streamer can be considered a "state function" as described by Rob Pike in
 // [Lexical Scanning in Go] (GTUG Sydney; 30 August 2011).
 //
-// The stateful properties of Stream are captured by a closure returned by Emit.
+// The stateful properties of Streamer are captured by a closure returned by
+// func Stream.
 //
 // [Lexical Scanning in Go]: https://go.dev/talks/2011/lex.slide#19
-type Stream func(chan Symbol) Stream
+type Streamer func(chan Symbol) Streamer
 
-// Emit initializes and returns a Stream ready to tokenize a given input buffer.
-func Emit(buffer []byte) (stream Stream) {
+// Stream creates a Streamer ready to tokenize input from a given buffer.
+func Stream(buffer []byte) (s Streamer) {
 	// Use mode = scanner.ScanComments to emit COMMENT tokens.
 	const mode scanner.Mode = 0
 
@@ -27,9 +34,8 @@ func Emit(buffer []byte) (stream Stream) {
 	errs := &scanner.ErrorList{}
 	slog := log.New(log.DefaultWriter, log.DefaultFormat)
 
-	// The input buffer given with each call to Emit represents the entire input
-	// being scanned.
-	// No additional input may be appended.
+	// Buffer must contain the entire input.
+	// No additional input may be appended to a Streamer.
 	scan.Init(
 		token.NewFileSet().AddFile("", -1, len(buffer)),
 		buffer,
@@ -40,30 +46,34 @@ func Emit(buffer []byte) (stream Stream) {
 		mode,
 	)
 
-	// If the current input Symbol scanned is invalid (e.g., EOF, illegal, etc.),
-	// then stop scanning and return nil.
-	// Otherwise, the default next state returned from Stream is itself.
-	stream = func(c chan Symbol) Stream {
+	// The Streamer s must be named so that its definition can refer to itself
+	// recursively.
+	s = func(c chan Symbol) Streamer {
+		// Scanner must always make progress and output the Symbol it disovered.
 		pos, tok, lit := scan.Scan()
-		s := Symbol{Token: tok, Lit: lit, Pos: pos}
-		c <- s
-		if s.IsEOF() || s.IsIllegal() {
+		u := Symbol{Token: tok, Lit: lit, Pos: pos}
+		c <- u
+		// If the scanned input Symbol is invalid (e.g., EOF, illegal, etc.),
+		// then stop scanning and return nil.
+		if u.IsEOF() || u.IsIllegal() {
 			return nil
 		}
-		return stream
+		// Otherwise, the default next state returned from Streamer is itself.
+		return s
 	}
 	return
 }
 
-// Undo returns a Stream that outputs the given Symbol without scanning input.
+// Undo returns a Streamer that outputs the given Symbol without scanning input,
+// and that returns the Streamer receiver of Undo.
 //
-// Calling the Stream result will return the receiver of Undo. This relationship
-// allows for unlimited nesting, which means unlimited lookahead. For example:
+// This relationship allows for unlimited nesting, i.e., unlimited lookahead.
+// For example:
 //
 //	...
-func (e Stream) Undo(s Symbol) Stream {
-	return func(c chan Symbol) Stream {
-		c <- s
-		return e
+func (s Streamer) Undo(u Symbol) Streamer {
+	return func(c chan Symbol) Streamer {
+		c <- u
+		return s
 	}
 }
