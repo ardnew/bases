@@ -7,10 +7,11 @@ import (
 	"github.com/ardnew/bases/log"
 )
 
-// Sync contains the various channels and locks for coordinating goroutines
-// related to Streamer.
-type Sync struct {
+// Envoy delivers messages between goroutines.
+type Envoy struct {
 	Output chan Symbol
+	Signal chan interface{}
+	Notify chan interface{}
 }
 
 // Streamer scans and sends the current input [Symbol] to the given channel and
@@ -23,7 +24,7 @@ type Sync struct {
 // func Stream.
 //
 // [Lexical Scanning in Go]: https://go.dev/talks/2011/lex.slide#19
-type Streamer func(chan Symbol) Streamer
+type Streamer func(Envoy) Streamer
 
 // Stream creates a Streamer ready to tokenize input from a given buffer.
 func Stream(buffer []byte) (s Streamer) {
@@ -48,11 +49,11 @@ func Stream(buffer []byte) (s Streamer) {
 
 	// The Streamer s must be named so that its definition can refer to itself
 	// recursively.
-	s = func(c chan Symbol) Streamer {
+	s = func(e Envoy) Streamer {
 		// Scanner must always make progress and output the Symbol it disovered.
 		pos, tok, lit := scan.Scan()
 		u := Symbol{Token: tok, Lit: lit, Pos: pos}
-		c <- u
+		e.Output <- u
 		// If the scanned input Symbol is invalid (e.g., EOF, illegal, etc.),
 		// then stop scanning and return nil.
 		if u.IsEOF() || u.IsIllegal() {
@@ -72,8 +73,8 @@ func Stream(buffer []byte) (s Streamer) {
 //
 //	...
 func (s Streamer) Undo(u Symbol) Streamer {
-	return func(c chan Symbol) Streamer {
-		c <- u
+	return func(e Envoy) Streamer {
+		e.Output <- u
 		return s
 	}
 }
