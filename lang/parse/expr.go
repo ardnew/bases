@@ -2,6 +2,7 @@ package parse
 
 import (
 	"errors"
+	"go/token"
 	"io"
 	"strings"
 
@@ -15,11 +16,15 @@ var ErrInvalidExpr = errors.New("invalid expression")
 type Expr struct {
 	item
 	stream sym.Streamer
-	symbol chan sym.Symbol
+	valve  sym.Valve
 }
 
 func New() *Expr {
-	return &Expr{symbol: make(chan sym.Symbol)}
+	return &Expr{valve: sym.MakeValve(
+		func(u sym.Symbol) bool {
+			return u.IsEOF() || u.IsIllegal()
+		},
+	)}
 }
 
 func (e *Expr) Parse(r io.Reader) (n int64, err error) {
@@ -28,12 +33,12 @@ func (e *Expr) Parse(r io.Reader) (n int64, err error) {
 
 func (e *Expr) ParseBuffer(b []byte) (n int64, err error) {
 	e.stream = sym.Stream(b)
-	go func(s sym.Streamer, c chan sym.Symbol) {
-		for {
-			s = s(c)
+	go func(s sym.Streamer, v sym.Valve) {
+		for s != nil {
+			s = s(v)
 		}
-	}(e.stream, e.symbol)
-
+	}(e.stream, e.valve)
+	e.item = e.Climb(oper.Unbound)
 	return
 }
 
@@ -72,48 +77,48 @@ func wrap(s sym.Symbol) item {
 	}
 }
 
-// func Climb(stream sym.Stream, min oper.Level) (it item) {
-// 	s := lexer.Take()
-// 	l := wrap(s)
-// 	switch e := l.(type) {
-// 	case *stop, *term, *ctrl:
-// 	case *rule:
-// 		var prefix bool
-// 		switch e.Operator, prefix = oper.Default.Prefix(s.Token); {
-// 		case e.Spells(token.LPAREN):
-// 			l = Climb(lexer, oper.Unbound)
-// 			if t := lexer.Take(); !t.Is(sym.Operator(token.RPAREN)) {
-// 				lexer.Untake(t)
-// 			}
-// 		case prefix:
-// 			_, br := e.Level()
-// 			e.arg = append(e.arg, Climb(lexer, br))
-// 		default:
-// 		}
+func (ex *Expr) Climb(min oper.Level) (it item) {
+	s := <-ex.valve.Symbol
+	l := wrap(s)
+	switch e := l.(type) {
+	case *stop, *term, *ctrl:
+	case *rule:
+		var prefix bool
+		switch e.Operator, prefix = oper.Default.Prefix(s.Token); {
+		case e.Spells(token.LPAREN):
+			l = ex.Climb(oper.Unbound)
+			if t := <-ex.valve.Symbol; !t.Is(sym.Operator(token.RPAREN)) {
+				ex.stream = ex.stream.Undo(t)
+			}
+		case prefix:
+			_, br := e.Level()
+			e.arg = append(e.arg, ex.Climb(br))
+		default:
+		}
 
-// 	}
+	}
 
-// 	for {
-// 		if os := lexer.Look(); os.IsEOF() {
-// 			break
-// 		} else {
-// 			if op, ok := oper.Default.Postfix(os.Token); ok {
-// 				bl, _ := op.Level()
-// 				if bl.Int() < min.Int() {
-// 					break
-// 				}
-// 				lexer.Take()
-// 				l = newRule(os, l)
-// 				continue
-// 			} else {
-// 				lexer.Take()
-// 				break
-// 			}
-// 		}
-// 	}
+	// for {
+	// 	if os := lexer.Look(); os.IsEOF() {
+	// 		break
+	// 	} else {
+	// 		if op, ok := oper.Default.Postfix(os.Token); ok {
+	// 			bl, _ := op.Level()
+	// 			if bl.Int() < min.Int() {
+	// 				break
+	// 			}
+	// 			lexer.Take()
+	// 			l = newRule(os, l)
+	// 			continue
+	// 		} else {
+	// 			lexer.Take()
+	// 			break
+	// 		}
+	// 	}
+	// }
 
-// 	return l
-// }
+	return l
+}
 
 func newRule(s sym.Symbol, it ...item) *rule {
 	return &rule{
@@ -146,19 +151,6 @@ func newRule(s sym.Symbol, it ...item) *rule {
 // 	}
 
 // 	return false
-// }
-
-// func (t *Term) Parse(lexer lex.Lexer, level oper.Level) Expr {
-// 	switch s := lexer.Look(); {
-// 	case s.IsTerminal():
-// 		*t = Term{lexer.Take()}
-// 		return t
-// 	case s.IsEOF() || !s.IsLegal():
-// 		*t = Term{lexer.Take()}
-// 		return nil
-// 	default:
-// 		return nil
-// 	}
 // }
 
 func (r *rule) String() string {

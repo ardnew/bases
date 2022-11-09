@@ -7,13 +7,6 @@ import (
 	"github.com/ardnew/bases/log"
 )
 
-// Envoy delivers messages between goroutines.
-type Envoy struct {
-	Output chan Symbol
-	Signal chan interface{}
-	Notify chan interface{}
-}
-
 // Streamer scans and sends the current input [Symbol] to the given channel and
 // returns a Streamer that will repeat this process on the next input Symbol.
 //
@@ -24,7 +17,7 @@ type Envoy struct {
 // func Stream.
 //
 // [Lexical Scanning in Go]: https://go.dev/talks/2011/lex.slide#19
-type Streamer func(Envoy) Streamer
+type Streamer func(Valve) Streamer
 
 // Stream creates a Streamer ready to tokenize input from a given buffer.
 func Stream(buffer []byte) (s Streamer) {
@@ -49,14 +42,15 @@ func Stream(buffer []byte) (s Streamer) {
 
 	// The Streamer s must be named so that its definition can refer to itself
 	// recursively.
-	s = func(e Envoy) Streamer {
+	s = func(v Valve) Streamer {
 		// Scanner must always make progress and output the Symbol it disovered.
 		pos, tok, lit := scan.Scan()
 		u := Symbol{Token: tok, Lit: lit, Pos: pos}
-		e.Output <- u
-		// If the scanned input Symbol is invalid (e.g., EOF, illegal, etc.),
-		// then stop scanning and return nil.
-		if u.IsEOF() || u.IsIllegal() {
+		v.Symbol <- u
+		// If the scanned input Symbol indicates end of the stream,
+		// then stop scanning, close output channel, and return nil.
+		if v.Close(u) {
+			close(v.Symbol)
 			return nil
 		}
 		// Otherwise, the default next state returned from Streamer is itself.
@@ -65,16 +59,25 @@ func Stream(buffer []byte) (s Streamer) {
 	return
 }
 
-// Undo returns a Streamer that outputs the given Symbol without scanning input,
-// and that returns the Streamer receiver of Undo.
+// Undo returns a Streamer that outputs the given Symbol without scanning input
+// and then returns the receiver of Undo.
 //
 // This relationship allows for unlimited nesting, i.e., unlimited lookahead.
 // For example:
 //
 //	...
 func (s Streamer) Undo(u Symbol) Streamer {
-	return func(e Envoy) Streamer {
-		e.Output <- u
+	return func(v Valve) Streamer {
+		v.Symbol <- u
 		return s
 	}
+}
+
+type Valve struct {
+	Symbol chan Symbol
+	Close  func(Symbol) bool
+}
+
+func MakeValve(f func(Symbol) bool) Valve {
+	return Valve{Symbol: make(chan Symbol), Close: f}
 }

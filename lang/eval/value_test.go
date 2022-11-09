@@ -15,16 +15,16 @@ func TestEvalString(t *testing.T) {
 		rpn string
 	}{
 		// TODO: Add test cases.
-		{
-			name:   "literal",
-			string: `"hello"`,
-			rpn:    `"hello"`,
-		},
-		{
-			name:   "ident",
-			string: `foo`,
-			rpn:    `foo`,
-		},
+		// {
+		// 	name:   "literal",
+		// 	string: `"hello"`,
+		// 	rpn:    `"hello"`,
+		// },
+		// {
+		// 	name:   "ident",
+		// 	string: `foo`,
+		// 	rpn:    `foo`,
+		// },
 		{
 			name:   "prefix",
 			string: `--(++2)`,
