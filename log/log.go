@@ -2,9 +2,11 @@ package log
 
 import (
 	"fmt"
+	"go/token"
 	"io"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -41,6 +43,7 @@ type Log struct {
 	out io.Writer  // Destination for output
 	buf []byte     // For accumulating text to write
 	nul int32      // Atomic boolean: whether out == io.Discard
+	off int        // Calldepth constant offset for wrappers
 }
 
 // New creates a new Log. The out variable sets the destination to which log
@@ -52,6 +55,62 @@ func New(output io.Writer, format string) *Log {
 		l.nul = 1
 	}
 	return l
+}
+
+type errInvalidEnvPrefix string
+
+func (e errInvalidEnvPrefix) Error() string {
+	return "invalid env prefix: " + string(e)
+}
+
+// LookupEnv looks for environment variables named "{prefix}_FILE" and
+// "{prefix}_FORMAT" and returns a corresponding io.Writer and string for
+// creating a new Log.
+//
+// The value of "{prefix}_FILE" may be prefixed with optional mode flags
+// ">" (truncate) or ">>" (append) if the log file already exists:
+//
+//	LOG_FILE='>/tmp/perf.dat'       # truncate: overwrite existing data
+//	LOG_FILE='>>history.dat'        # append: preserving existing data
+//	LOG_FILE='../run.log'           # unspecified will truncate by default
+func LookupEnv(prefix string) (w io.Writer, format string, err error) {
+	const (
+		fileSuffix   = "_FILE"
+		formatSuffix = "_FORMAT"
+		fileMode     = 0o666
+		truncateFlag = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+		appendFlag   = os.O_WRONLY | os.O_CREATE | os.O_APPEND
+	)
+	// Go identifiers and bare env identifiers are basically the same
+	if prefix != "" && !token.IsIdentifier(prefix) {
+		return nil, "", errInvalidEnvPrefix(prefix)
+	}
+	if ev, ok := os.LookupEnv(prefix + fileSuffix); ok {
+		flag := truncateFlag
+		name := strings.TrimPrefix(ev, ">")
+		if strings.HasPrefix(ev, ">") {
+			flag = appendFlag
+			name = strings.TrimPrefix(name, ">")
+		}
+		w, err = os.OpenFile(name, flag, fileMode)
+		format, _ = os.LookupEnv(prefix + formatSuffix)
+	}
+	if w == nil {
+		err = os.ErrNotExist
+	} else if format == "" {
+		format = DefaultFormat
+	}
+	return
+}
+
+// SetCallerOffset sets the offset k for calls to runtime.Caller(depth + k).
+//
+// This is mostly necessary for anyone wrapping the Log functions and need to
+// correct which frame is selected in the callstack.
+func (l *Log) SetCallerOffset(offset int) {
+	l.mut.Lock()
+	defer l.mut.Unlock()
+	l.off = offset
 }
 
 // Writer returns the output destination for the Log.
@@ -277,7 +336,7 @@ func (l *Log) format(calldepth int, message string) {
 						// release lock while getting caller info - it's expensive.
 						l.mut.Unlock()
 						var ok bool
-						if _, file, line, ok = runtime.Caller(calldepth); !ok {
+						if _, file, line, ok = runtime.Caller(calldepth + l.off); !ok {
 							file = "???"
 							line = 0
 						}

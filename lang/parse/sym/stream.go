@@ -3,6 +3,7 @@ package sym
 import (
 	"go/scanner"
 	"go/token"
+	"io"
 
 	"github.com/ardnew/bases/log"
 )
@@ -33,7 +34,11 @@ func Stream(buffer []byte) (s Streamer) {
 
 	scan := &scanner.Scanner{}
 	errs := &scanner.ErrorList{}
-	slog := log.New(log.DefaultWriter, log.DefaultFormat)
+	slog := log.New(io.Discard, "")
+	if w, f, e := log.LookupEnv("STREAM"); e == nil {
+		slog = log.New(w, f)
+		slog.SetCallerOffset(1)
+	}
 
 	// Buffer must contain the entire input.
 	// No additional input may be appended to a Streamer.
@@ -53,6 +58,7 @@ func Stream(buffer []byte) (s Streamer) {
 		// Scanner must always make progress and output the Symbol it disovered.
 		pos, tok, lit := scan.Scan()
 		u := Symbol{Token: tok, Lit: lit, Pos: pos}
+		slog.Printf("Lex: %s\n", u)
 		c <- u
 		// If the scanned Symbol indicates the end of input,
 		// then return nil to encourage the caller to stop scanning.
@@ -86,10 +92,10 @@ func (s *Streamer) Go(c chan Symbol, p ...Stopper) {
 // This allows for unlimited nesting, i.e., unlimited lookahead. For example:
 //
 //	...
-func (s Streamer) Undo(u Symbol) Streamer {
+func (s *Streamer) Undo(u Symbol) Streamer {
 	return func(c chan Symbol, _ ...Stopper) Streamer {
 		c <- u
-		return s
+		return *s
 	}
 }
 

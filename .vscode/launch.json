@@ -15,6 +15,12 @@
         "-test.failfast",
         "-test.run=TestEvalString"
       ],
+      "env": {
+        "EXPR_FILE": "/dev/stderr",
+        "EXPR_FORMAT": "[%t] %f:%n ┆ %s",
+        // "STREAM_FILE": "/dev/stderr",
+        // "STREAM_FORMAT": "[%t] %f:%n ┆ %s",
+      },
       "dlvFlags": [],
       "stopOnEntry": true, // NOT "stop on main entry"
     }

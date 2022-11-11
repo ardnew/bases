@@ -8,31 +8,48 @@ import (
 
 	"github.com/ardnew/bases/lang/parse/oper"
 	"github.com/ardnew/bases/lang/parse/sym"
+	"github.com/ardnew/bases/log"
 )
 
 var ErrInvalidExpr = errors.New("invalid expression")
+
+// var elog = log.New(log.DefaultWriter, "%f:%n ┆ %s")
 
 // Expr represents an expression tree.
 type Expr struct {
 	item
 	sym.Streamer
-	in chan sym.Symbol
-
-	nb int
+	in  chan sym.Symbol
+	log *log.Log
 }
 
-func New() *Expr { return &Expr{in: make(chan sym.Symbol)} }
+func New() *Expr {
+	p := &Expr{
+		in: make(chan sym.Symbol),
+	}
+	if w, f, e := log.LookupEnv("EXPR"); e == nil {
+		p.log = log.New(w, f)
+		p.log.SetCallerOffset(2)
+	}
+	return p
+}
+
+func (e *Expr) logf(format string, v ...interface{}) {
+	if e.log != nil {
+		e.log.Printf(format, v...)
+	}
+}
 
 func (e *Expr) Parse(r io.Reader) (n int64, err error) {
 	return
 }
 
 func (e *Expr) ParseBuffer(b []byte) (n int64, err error) {
+	e.logf("ParseBuffer(%+v): %q", b, string(b))
 	e.Streamer = sym.Stream(b)
 	e.Go(e.in, sym.IsEOF, sym.IsIllegal)
-	e.nb = 0
-	e.item = e.Climb(oper.Unbound)
-	return int64(e.nb), e.Err()
+	e.item = e.Climb(0, oper.Unbound)
+	return
 }
 
 func (e *Expr) ParseString(s string) (n int64, err error) {
@@ -70,50 +87,46 @@ func wrap(s sym.Symbol) item {
 	}
 }
 
-func (ex *Expr) Climb(min oper.Level) (it item) {
+func (ex *Expr) Climb(depth int, min oper.Level) (it item) {
 	s := <-ex.in
-	defer func(nb int) {
-		if ex.nb < nb {
-			ex.nb = nb
-		}
-	}(int(s.Pos) + len(s.String()))
 	l := wrap(s)
+	ex.logf("%*s%s -> %T:", depth*2, "", s, l)
 	switch e := l.(type) {
 	case *stop, *term, *ctrl:
 	case *rule:
 		var prefix bool
 		switch e.Operator, prefix = oper.Default.Prefix(s.Token); {
 		case e.Spells(token.LPAREN):
-			l = ex.Climb(oper.Unbound)
+			l = ex.Climb(depth+1, oper.Unbound)
 			if t := <-ex.in; !t.Is(sym.Operator(token.RPAREN)) {
 				ex.Streamer = ex.Undo(t)
 			}
 		case prefix:
 			_, br := e.Level()
-			e.arg = append(e.arg, ex.Climb(br))
+			e.arg = append(e.arg, ex.Climb(depth+1, br))
 		default:
 		}
 	}
 
-	// for {
-	// 	if os := lexer.Look(); os.IsEOF() {
-	// 		break
-	// 	} else {
-	// 		if op, ok := oper.Default.Postfix(os.Token); ok {
-	// 			bl, _ := op.Level()
-	// 			if bl.Int() < min.Int() {
-	// 				break
-	// 			}
-	// 			lexer.Take()
-	// 			l = newRule(os, l)
-	// 			continue
-	// 		} else {
-	// 			lexer.Take()
-	// 			break
-	// 		}
-	// 	}
-	// }
-
+	for {
+		if os := ex.Peek(ex.in); os.IsEOF() {
+			break
+		} else {
+			if op, ok := oper.Default.Postfix(os.Token); ok {
+				bl, _ := op.Level()
+				if bl.Int() < min.Int() {
+					break
+				}
+				<-ex.in
+				l = newRule(os, l)
+				continue
+			} else {
+				<-ex.in
+				break
+			}
+		}
+	}
+	ex.logf("%*s= %s", depth*2, "", l)
 	return l
 }
 
