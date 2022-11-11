@@ -45,6 +45,37 @@ func Literal(tok token.Token, lit string) Symbol {
 
 // IsIllegal returns true if the token is equal to [token.ILLEGAL];
 // it returns false otherwise.
+func IsIllegal(s Symbol) bool {
+	return s.Token == token.ILLEGAL
+}
+
+// IsEOF returns true if the token is equal to [token.EOF];
+// it returns false otherwise.
+func IsEOF(s Symbol) bool {
+	return s.Token == token.EOF
+}
+
+// IsIdentifier returns true if the token is a valid Go identifier;
+// it returns false otherwise.
+//
+// The token is a valid identifier if it is equal to [token.IDENT] and
+// token.IsIdentifier(s.Lit) returns true (see [go/token.IsIdentifier]).
+func IsIdentifier(s Symbol) bool {
+	return s.Token == token.IDENT && token.IsIdentifier(s.Lit)
+}
+
+// IsLiteral returns true if the token is one of the five basic types:
+// [token.INT], [token.FLOAT], [token.IMAG], [token.CHAR], or [token.STRING];
+// it returns false otherwise.
+//
+// Unlike [go/token.Token.IsLiteral], identifiers are not considered literals.
+// In other words, s.IsIdentifier() and s.IsLiteral() are mutually exclusive.
+func IsLiteral(s Symbol) bool {
+	return s.Token != token.IDENT && s.Token.IsLiteral()
+}
+
+// IsIllegal returns true if the token is equal to [token.ILLEGAL];
+// it returns false otherwise.
 func (s Symbol) IsIllegal() bool {
 	return s.Token == token.ILLEGAL
 }

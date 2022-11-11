@@ -15,31 +15,24 @@ var ErrInvalidExpr = errors.New("invalid expression")
 // Expr represents an expression tree.
 type Expr struct {
 	item
-	stream sym.Streamer
-	valve  sym.Valve
+	sym.Streamer
+	in chan sym.Symbol
+
+	nb int
 }
 
-func New() *Expr {
-	return &Expr{valve: sym.MakeValve(
-		func(u sym.Symbol) bool {
-			return u.IsEOF() || u.IsIllegal()
-		},
-	)}
-}
+func New() *Expr { return &Expr{in: make(chan sym.Symbol)} }
 
 func (e *Expr) Parse(r io.Reader) (n int64, err error) {
 	return
 }
 
 func (e *Expr) ParseBuffer(b []byte) (n int64, err error) {
-	e.stream = sym.Stream(b)
-	go func(s sym.Streamer, v sym.Valve) {
-		for s != nil {
-			s = s(v)
-		}
-	}(e.stream, e.valve)
+	e.Streamer = sym.Stream(b)
+	e.Go(e.in, sym.IsEOF, sym.IsIllegal)
+	e.nb = 0
 	e.item = e.Climb(oper.Unbound)
-	return
+	return int64(e.nb), e.Err()
 }
 
 func (e *Expr) ParseString(s string) (n int64, err error) {
@@ -78,7 +71,12 @@ func wrap(s sym.Symbol) item {
 }
 
 func (ex *Expr) Climb(min oper.Level) (it item) {
-	s := <-ex.valve.Symbol
+	s := <-ex.in
+	defer func(nb int) {
+		if ex.nb < nb {
+			ex.nb = nb
+		}
+	}(int(s.Pos) + len(s.String()))
 	l := wrap(s)
 	switch e := l.(type) {
 	case *stop, *term, *ctrl:
@@ -87,15 +85,14 @@ func (ex *Expr) Climb(min oper.Level) (it item) {
 		switch e.Operator, prefix = oper.Default.Prefix(s.Token); {
 		case e.Spells(token.LPAREN):
 			l = ex.Climb(oper.Unbound)
-			if t := <-ex.valve.Symbol; !t.Is(sym.Operator(token.RPAREN)) {
-				ex.stream = ex.stream.Undo(t)
+			if t := <-ex.in; !t.Is(sym.Operator(token.RPAREN)) {
+				ex.Streamer = ex.Undo(t)
 			}
 		case prefix:
 			_, br := e.Level()
 			e.arg = append(e.arg, ex.Climb(br))
 		default:
 		}
-
 	}
 
 	// for {
