@@ -19,14 +19,11 @@ var ErrInvalidExpr = errors.New("invalid expression")
 type Expr struct {
 	item
 	sym.Streamer
-	in  chan sym.Symbol
 	log *log.Log
 }
 
 func New() *Expr {
-	p := &Expr{
-		in: make(chan sym.Symbol),
-	}
+	p := &Expr{}
 	if w, f, e := log.LookupEnv("EXPR"); e == nil {
 		p.log = log.New(w, f)
 		p.log.SetCallerOffset(2)
@@ -46,8 +43,7 @@ func (e *Expr) Parse(r io.Reader) (n int64, err error) {
 
 func (e *Expr) ParseBuffer(b []byte) (n int64, err error) {
 	e.logf("ParseBuffer(%+v): %q", b, string(b))
-	e.Streamer = sym.Stream(b)
-	e.Go(e.in, sym.IsEOF, sym.IsIllegal)
+	e.Streamer = sym.Stream(b, sym.IsEOF, sym.IsIllegal)
 	e.item = e.Climb(0, oper.Unbound)
 	return
 }
@@ -88,7 +84,7 @@ func wrap(s sym.Symbol) item {
 }
 
 func (ex *Expr) Climb(depth int, min oper.Level) (it item) {
-	s := <-ex.in
+	s := ex.Next()
 	l := wrap(s)
 	ex.logf("%*s%s -> %T:", depth*2, "", s, l)
 	switch e := l.(type) {
@@ -98,7 +94,7 @@ func (ex *Expr) Climb(depth int, min oper.Level) (it item) {
 		switch e.Operator, prefix = oper.Default.Prefix(s.Token); {
 		case e.Spells(token.LPAREN):
 			l = ex.Climb(depth+1, oper.Unbound)
-			if t := <-ex.in; !t.Is(sym.Operator(token.RPAREN)) {
+			if t := ex.Next(); !t.Is(sym.Operator(token.RPAREN)) {
 				ex.Streamer = ex.Undo(t)
 			}
 		case prefix:
@@ -109,19 +105,23 @@ func (ex *Expr) Climb(depth int, min oper.Level) (it item) {
 	}
 
 	for {
-		if os := ex.Peek(ex.in); os.IsEOF() {
+		if os := ex.Peek(); os.IsEOF() {
 			break
 		} else {
 			if op, ok := oper.Default.Postfix(os.Token); ok {
 				bl, _ := op.Level()
-				if bl.Int() < min.Int() {
+				var bm int
+				if min != oper.Unbound {
+					bm = min.Int()
+				}
+				if bl.Int() < bm {
 					break
 				}
-				<-ex.in
+				ex.Next()
 				l = newRule(os, l)
 				continue
 			} else {
-				<-ex.in
+				ex.Next()
 				break
 			}
 		}

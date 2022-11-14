@@ -15,20 +15,20 @@ import (
 // then it becomes the final Symbol added before closing the output channel.
 //
 // Streamer can be considered a "state function" as described by Rob Pike in
-// [Lexical Scanning in Go] (GTUG Sydney; 30 August 2011).
+// [Lexical Scanning in Go] (GTUG Sydney; 30 August 2011).e
 //
 // The stateful properties of Streamer are captured by a closure returned by
 // func Stream.
 //
 // [Lexical Scanning in Go]: https://go.dev/talks/2011/lex.slide#19
-type Streamer func(chan Symbol, ...Stopper) Streamer
+type Streamer func() (Streamer, Symbol)
 
 // Stopper returns true if the given [Symbol] represents an end of file
 // (or end of stream). It returns false otherwise.
 type Stopper func(Symbol) bool
 
 // Stream creates a Streamer ready to tokenize input from a given buffer.
-func Stream(buffer []byte) (s Streamer) {
+func Stream(buffer []byte, p ...Stopper) (s Streamer) {
 	// Use mode = scanner.ScanComments to emit COMMENT tokens.
 	const mode scanner.Mode = 0
 
@@ -52,38 +52,43 @@ func Stream(buffer []byte) (s Streamer) {
 		mode,
 	)
 
+	gate := make(chan Symbol)
+	quit := make(chan Symbol)
+	go func() {
+		var halt bool
+		for !halt {
+			pos, tok, lit := scan.Scan()
+			u := Symbol{Token: tok, Lit: lit, Pos: pos}
+			slog.Printf("Scan: SCAN: \"%s\" [%+v]", u, u)
+			select {
+			case q := <-quit:
+				slog.Printf("Scan: QUIT: \"%s\" [%+v]", q, q)
+				halt = true
+			case gate <- u:
+				slog.Printf("Scan: SEND: %s", u)
+			}
+		}
+	}()
+
 	// The Streamer s must be named so that its definition can refer to itself
 	// recursively.
-	s = func(c chan Symbol, p ...Stopper) Streamer {
-		// Scanner must always make progress and output the Symbol it disovered.
-		pos, tok, lit := scan.Scan()
-		u := Symbol{Token: tok, Lit: lit, Pos: pos}
-		slog.Printf("Lex: %s\n", u)
-		c <- u
+	s = func() (Streamer, Symbol) {
+		u := <-gate
+		slog.Printf("Stream: RECV: %s", u)
 		// If the scanned Symbol indicates the end of input,
-		// then return nil to encourage the caller to stop scanning.
+		// then halt the scanner, close output channel, and return nil.
 		for _, e := range p {
 			if e(u) {
-				// Close to let other goroutines 'range' over the output channel.
-				close(c)
-				return nil
+				slog.Printf("Stream: STOP: \"%s\" [%+v]", u, u)
+				quit <- u
+				return nil, u
 			}
 		}
 		// Reuse the closure; Scanner is positioned immediately after the unread
 		// Symbol in the output channel.
-		return s
+		return s, u
 	}
 	return
-}
-
-// Go creates a new goroutine that scans input Symbols and sends them to the
-// given channel until no input remains or a given [Stopper] returned true.
-func (s *Streamer) Go(c chan Symbol, p ...Stopper) {
-	go func(s *Streamer, c chan Symbol, p ...Stopper) {
-		for s != nil {
-			*s = (*s)(c, p...)
-		}
-	}(s, c, p...)
 }
 
 // Undo returns a Streamer that outputs the given Symbol without scanning input
@@ -92,11 +97,13 @@ func (s *Streamer) Go(c chan Symbol, p ...Stopper) {
 // This allows for unlimited nesting, i.e., unlimited lookahead. For example:
 //
 //	...
-func (s *Streamer) Undo(u Symbol) Streamer {
-	return func(c chan Symbol, _ ...Stopper) Streamer {
-		c <- u
-		return *s
-	}
+func (s Streamer) Undo(u Symbol) Streamer {
+	return func() (Streamer, Symbol) { return s, u }
+}
+
+func (s *Streamer) Next() (a Symbol) {
+	*s, a = (*s)()
+	return
 }
 
 // Peek returns the next Symbol in the input stream.
@@ -104,10 +111,8 @@ func (s *Streamer) Undo(u Symbol) Streamer {
 //
 // Peek is not technically a state function, as it does not return a Streamer.
 // However, it does modify its receiver by wrapping Undo over it.
-func (s *Streamer) Peek(c chan Symbol) (a Symbol) {
-	if u, ok := <-c; ok {
-		a = u
-		*s = s.Undo(u)
-	}
+func (s *Streamer) Peek() (a Symbol) {
+	a = s.Next()
+	*s = s.Undo(a)
 	return
 }
