@@ -88,7 +88,9 @@ func (ex *Expr) Climb(depth int, min oper.Level) (it item) {
 	l := wrap(s)
 	ex.logf("%*s%s -> %T:", depth*2, "", s, l)
 	switch e := l.(type) {
-	case *stop, *term, *ctrl:
+	case *stop:
+
+	case *term, *ctrl:
 	case *rule:
 		var prefix bool
 		switch e.Operator, prefix = oper.Default.Prefix(s.Token); {
@@ -110,17 +112,24 @@ func (ex *Expr) Climb(depth int, min oper.Level) (it item) {
 		} else {
 			if op, ok := oper.Default.Postfix(os.Token); ok {
 				bl, _ := op.Level()
-				var bm int
-				if min != oper.Unbound {
-					bm = min.Int()
-				}
-				if bl.Int() < bm {
+				if oper.Compare(bl, min) < 0 {
 					break
 				}
 				ex.Next()
 				l = newRule(os, l)
 				continue
+			} else if op, ok := oper.Default.Infix(os.Token); ok {
+				bl, rl := op.Level()
+				if oper.Compare(bl, min) < 0 {
+					break
+				}
+				ex.Next()
+				r := ex.Climb(depth+1, rl)
+				l = newRule(os, l, r)
+				continue
 			} else {
+				// Error!
+				ex.logf("Unexpected token: %T: %q [% x]", os, os, os)
 				ex.Next()
 				break
 			}

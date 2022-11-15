@@ -41,14 +41,52 @@ package oper
 type Level interface {
 	// Int returns the binding level as a native int type.
 	Int() int
+	// Compare returns an integer comparing Level receiver a to Level argument b.
+	// The result will be <0, 0, >0 when a<b, a=b, a>b, respectively.
+	Compare(Level) int
 }
 
 // Unbound represents an absent binding level, esp. for unary Operators
 // associated with a single operand on either the LHS or RHS.
 var Unbound Level
 
+// Compare returns an integer comparing Level argument a to Level argument b.
+// The result will be <0, 0, >0 when a<b, a=b, a>b, respectively.
+func Compare(a, b Level) int {
+	// Determine if either argument is Unbound.
+	// Unbound is considered less than all Levels (n.b., Unbound < lvl(0)).
+	a0, b0 := a == Unbound, b == Unbound
+	if a0 && b0 {
+		// a == Unbound && b == Unbound
+		return 0 // a == b
+	}
+	if a0 {
+		// a == Unbound && b != Unbound
+		return -1 // a < b
+	}
+	if b0 {
+		// a != Unbound && b == Unbound
+		return +1 // a > b
+	}
+	// Neither argument is Unbound.
+	// Compare their native integer values.
+	ai, bi := a.Int(), b.Int()
+	if ai < bi {
+		return -1 // a < b
+	}
+	if ai > bi {
+		return +1 // a > b
+	}
+	return 0 // a == b
+}
+
 // lvl is a minimal implementation of Level.
 type lvl int
 
 // Int returns the binding level as a native int type.
 func (i lvl) Int() int { return int(i) }
+
+// Compare returns an integer comparing lvl receiver i to Level argument j.
+// The result will be <0, 0, >0 when i<j, i=j, i>j, respectively.
+// If j is Unbound (nil), the result will always be >0.
+func (i lvl) Compare(j Level) int { return Compare(i, j) }
