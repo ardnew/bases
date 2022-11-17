@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// FormatSpec represents a printf-style format specifier ('%'-escaped rune).
+// FormatSpec represents a Printf-style format specifier ('%'-escaped rune).
 //
 // No padding or width arguments are supported. The specifiers are simply
 // text replacement tokens performed in a single scan of the format string.
@@ -48,13 +48,28 @@ type Log struct {
 
 // New creates a new Log. The out variable sets the destination to which log
 // data will be written. The format of the log message is defined via fmt which
-// contains printf-style specifiers ('%'-escaped runes).
-func New(output io.Writer, format string) *Log {
-	l := &Log{out: output, fmt: []rune(format)}
+// contains Printf-style specifiers ('%'-escaped runes), with elements joined by
+// a single space.
+func New(output io.Writer, fmt ...string) *Log {
+	f := DefaultFormat
+	if len(fmt) > 0 {
+		f = strings.Join(fmt, " ")
+	}
+	l := &Log{out: output, fmt: []rune(f)}
 	if output == io.Discard {
 		l.nul = 1
 	}
 	return l
+}
+
+// LookupNew creates a new Log using the io.Writer and format string returned
+// from [LookupEnv] with the given prefix.
+// If LookupEnv returns an error, the returned Log writes to [io.Discard].
+func LookupNew(prefix string) *Log {
+	if w, f, e := LookupEnv(prefix); e == nil {
+		return New(w, f)
+	}
+	return New(io.Discard)
 }
 
 type errInvalidEnvPrefix string
@@ -78,8 +93,9 @@ func LookupEnv(prefix string) (w io.Writer, format string, err error) {
 		fileSuffix   = "_FILE"
 		formatSuffix = "_FORMAT"
 		fileMode     = 0o666
-		truncateFlag = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-		appendFlag   = os.O_WRONLY | os.O_CREATE | os.O_APPEND
+		createFlag   = os.O_WRONLY | os.O_CREATE
+		truncateFlag = createFlag | os.O_TRUNC
+		appendFlag   = createFlag | os.O_APPEND
 	)
 	// Go identifiers and bare env identifiers are basically the same
 	if prefix != "" && !token.IsIdentifier(prefix) {
@@ -103,6 +119,13 @@ func LookupEnv(prefix string) (w io.Writer, format string, err error) {
 	return
 }
 
+// CallerOffset returns the offset k for calls to runtime.Caller(depth + k).
+func (l *Log) CallerOffset() int {
+	l.mut.Lock()
+	defer l.mut.Unlock()
+	return l.off
+}
+
 // SetCallerOffset sets the offset k for calls to runtime.Caller(depth + k).
 //
 // This is mostly necessary for anyone wrapping the Log functions and need to
@@ -111,6 +134,13 @@ func (l *Log) SetCallerOffset(offset int) {
 	l.mut.Lock()
 	defer l.mut.Unlock()
 	l.off = offset
+}
+
+// Call calls fn with the receiver's caller offset temporarily set to offset.
+func (l *Log) Call(offset int, fn func()) {
+	defer l.SetCallerOffset(l.CallerOffset())
+	l.SetCallerOffset(offset)
+	fn()
 }
 
 // Writer returns the output destination for the Log.
@@ -132,7 +162,7 @@ func (l *Log) SetWriter(w io.Writer) {
 	atomic.StoreInt32(&l.nul, nul)
 }
 
-// Format returns the printf-style format string that describes the structure
+// Format returns the Printf-style format string that describes the structure
 // and content of log messages.
 //
 // See type [FormatSpec] for available specifiers and see const [DefaultFormat]
@@ -143,7 +173,7 @@ func (l *Log) Format() string {
 	return string(l.fmt)
 }
 
-// SetFormat sets the printf-style format string that describes the structure
+// SetFormat sets the Printf-style format string that describes the structure
 // and content of log messages.
 //
 // See type [FormatSpec] for available specifiers and see const [DefaultFormat]
@@ -162,15 +192,6 @@ func (l *Log) Output(calldepth int, s string) error {
 	return err
 }
 
-// Printf calls method Output for writing to the Log.
-// Arguments are handled in the manner of [fmt.Printf].
-func (l *Log) Printf(format string, v ...any) {
-	if atomic.LoadInt32(&l.nul) != 0 {
-		return
-	}
-	l.Output(2, fmt.Sprintf(format, v...))
-}
-
 // Print calls method Output for writing to the Log.
 // Arguments are handled in the manner of [fmt.Print].
 func (l *Log) Print(v ...any) {
@@ -178,6 +199,15 @@ func (l *Log) Print(v ...any) {
 		return
 	}
 	l.Output(2, fmt.Sprint(v...))
+}
+
+// Printf calls method Output for writing to the Log.
+// Arguments are handled in the manner of [fmt.Printf].
+func (l *Log) Printf(format string, v ...any) {
+	if atomic.LoadInt32(&l.nul) != 0 {
+		return
+	}
+	l.Output(2, fmt.Sprintf(format, v...))
 }
 
 // Println calls method Output for writing to the Log.
@@ -318,7 +348,7 @@ var spec = map[FormatSpec]func(out *[]byte, a specArgs){
 	},
 }
 
-// format replaces printf-style format specifiers found in fmt with their
+// format replaces Printf-style format specifiers found in fmt with their
 // corresponding values.
 func (l *Log) format(calldepth int, message string) {
 	now, line := time.Now(), -1

@@ -3,9 +3,6 @@ package sym
 import (
 	"go/scanner"
 	"go/token"
-	"io"
-
-	"github.com/ardnew/bases/log"
 )
 
 type scan struct {
@@ -13,7 +10,6 @@ type scan struct {
 	*scanner.ErrorList
 	Gate chan Symbol
 	Quit chan Symbol
-	*log.Log
 }
 
 // Scan creates a new scan and a new goroutine that tokenizes the input into a
@@ -35,11 +31,6 @@ func Scan(buffer []byte) *scan {
 		ErrorList: &scanner.ErrorList{},
 		Gate:      make(chan Symbol),
 		Quit:      make(chan Symbol),
-		Log:       log.New(io.Discard, ""),
-	}
-	if w, f, e := log.LookupEnv("STREAM"); e == nil {
-		l.Log = log.New(w, f)
-		l.SetCallerOffset(1)
 	}
 	// Buffer must contain the entire input.
 	// No additional input may be appended to a Streamer.
@@ -47,7 +38,7 @@ func Scan(buffer []byte) *scan {
 		token.NewFileSet().AddFile("", -1, len(buffer)),
 		buffer,
 		func(pos token.Position, msg string) {
-			l.Printf("error (%s): %s", pos, msg)
+			logf("error (%s): %s", pos, msg)
 			l.Add(pos, msg)
 		},
 		mode,
@@ -63,19 +54,19 @@ func (l *scan) run() {
 	for !halt {
 		pos, tok, lit := l.Scan()
 		u := Symbol{Token: tok, Lit: lit, Pos: pos}
-		l.Printf("Lex: SCAN: \"%s\" [%+v]", u, u)
+		logf("Lex: SCAN: \"%s\" [%+v]", u, u)
 		// Block until we have either received a Symbol on the Quit channel, or
 		// something has received the Symbol being sent on the Gate channel.
 		select {
 		// Stop scanning input and exit this goroutine once anything is received on
 		// the Quit channel.
 		case q := <-l.Quit:
-			l.Printf("Lex: QUIT: \"%s\" [%+v]", q, q)
+			logf("Lex: QUIT: \"%s\" [%+v]", q, q)
 			halt = true
 		// Once the Symbol is received on the Gate channel, we immediately begin
 		// scanning input for the next Symbol.
 		case l.Gate <- u:
-			l.Printf("Lex: GATE: %s", u)
+			logf("Lex: GATE: %s", u)
 		}
 	}
 }

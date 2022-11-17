@@ -27,12 +27,12 @@ func Stream(buffer []byte, p ...Stopper) (s Streamer) {
 	// recursively.
 	s = func() (Symbol, Streamer) {
 		u := <-scan.Gate
-		scan.Printf("Stream: GATE: %s", u)
+		logf("Stream: GATE: %s", u)
 		// If the scanned Symbol indicates the end of input,
 		// then halt the scanner, close output channel, and return nil.
 		for _, e := range p {
 			if e(u) {
-				scan.Printf("Stream: STOP: \"%s\" [%+v]", u, u)
+				logf("Stream: STOP: \"%s\" [%+v]", u, u)
 				scan.Quit <- u
 				return u, nil
 			}
