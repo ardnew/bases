@@ -8,7 +8,6 @@ import (
 
 	"github.com/ardnew/bases/lang/parse/oper"
 	"github.com/ardnew/bases/lang/parse/sym"
-	"github.com/ardnew/bases/log"
 )
 
 var ErrInvalidExpr = errors.New("invalid expression")
@@ -19,30 +18,16 @@ var ErrInvalidExpr = errors.New("invalid expression")
 type Expr struct {
 	item
 	sym.Streamer
-	log *log.Log
 }
 
-func New() *Expr {
-	p := &Expr{}
-	if w, f, e := log.LookupEnv("EXPR"); e == nil {
-		p.log = log.New(w, f)
-		p.log.SetCallerOffset(2)
-	}
-	return p
-}
-
-func (e *Expr) logf(format string, v ...interface{}) {
-	if e.log != nil {
-		e.log.Printf(format, v...)
-	}
-}
+func New() *Expr { return &Expr{} }
 
 func (e *Expr) Parse(r io.Reader) (n int64, err error) {
 	return
 }
 
 func (e *Expr) ParseBuffer(b []byte) (n int64, err error) {
-	e.logf("ParseBuffer(%+v): %q", b, string(b))
+	logf("ParseBuffer(%+v): %q", b, string(b))
 	e.Streamer = sym.Stream(b, sym.IsEOF, sym.IsIllegal)
 	e.item = e.Climb(0, oper.Unbound)
 	return
@@ -86,7 +71,7 @@ func wrap(s sym.Symbol) item {
 func (ex *Expr) Climb(depth int, min oper.Level) (it item) {
 	s := ex.Next()
 	l := wrap(s)
-	ex.logf("%*s%s -> %T:", depth*2, "", s, l)
+	logf("%*s%s -> %T:", depth*2, "", s, l)
 	switch e := l.(type) {
 	case *stop:
 
@@ -129,13 +114,13 @@ func (ex *Expr) Climb(depth int, min oper.Level) (it item) {
 				continue
 			} else {
 				// Error!
-				ex.logf("Unexpected token: %T: %q [% x]", os, os, os)
+				logf("Unexpected token: %T: %q [% x]", os, os, os)
 				ex.Next()
 				break
 			}
 		}
 	}
-	ex.logf("%*s= %s", depth*2, "", l)
+	logf("%*s= %s", depth*2, "", l)
 	return l
 }
 
@@ -145,32 +130,6 @@ func newRule(s sym.Symbol, it ...item) *rule {
 		arg:      append(make([]item, 0, oper.MaxArity), it...),
 	}
 }
-
-// func (t *Rule) Parse(lexer lex.Lexer, level oper.Level) Expr {
-// 	ls := lexer.Take()
-// 	switch oper, prefix := oper.Default.Prefix(ls.Token); {
-// 	case prefix && oper.Token() == token.LPAREN:
-// 		if e := t.Parse(lexer, oper.Unbound); e == nil {
-// 			// unexpected bytes or EOF
-// 		}
-// 		if !lexer.Check(sym.Token(token.RPAREN)) {
-// 			// unclosed paren
-// 		}
-
-// 	case prefix:
-// 		t.Op = oper
-// 		if e := t.Parse(lexer, oper.Right()); e == nil {
-// 			//
-// 		}
-// 		t.E = []Expr{}
-
-// 		e = &Rule{Op: oper, E: []Expr{climb(lexer, oper.Right())}}
-// 	default:
-// 		e = &Term{lhs}
-// 	}
-
-// 	return false
-// }
 
 func (r *rule) String() string {
 	var b strings.Builder

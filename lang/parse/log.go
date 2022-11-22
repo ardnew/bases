@@ -1,8 +1,8 @@
-package sym
+package parse
 
 import pkg "github.com/ardnew/bases/log"
 
-const logID = "SYM"
+const logID = "PARSE"
 
 var log = pkg.LookupNew(logID)
 

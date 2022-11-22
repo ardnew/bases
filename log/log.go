@@ -136,13 +136,6 @@ func (l *Log) SetCallerOffset(offset int) {
 	l.off = offset
 }
 
-// Call calls fn with the receiver's caller offset temporarily set to offset.
-func (l *Log) Call(offset int, fn func()) {
-	defer l.SetCallerOffset(l.CallerOffset())
-	l.SetCallerOffset(offset)
-	fn()
-}
-
 // Writer returns the output destination for the Log.
 func (l *Log) Writer() io.Writer {
 	l.mut.Lock()

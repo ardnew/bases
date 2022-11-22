@@ -57,6 +57,8 @@ func (s Streamer) Undo(u Symbol) Streamer {
 	return func() (Symbol, Streamer) { return u, s }
 }
 
+// Next returns the current Symbol in the input stream and begins scanning for
+// the next.
 func (s *Streamer) Next() (a Symbol) {
 	if *s == nil {
 		return EOF()
@@ -65,11 +67,7 @@ func (s *Streamer) Next() (a Symbol) {
 	return
 }
 
-// Peek returns the next Symbol in the input stream.
-// Unlike receiving from a channel, it does not remove it from the stream.
-//
-// Peek is not technically a state function, as it does not return a Streamer.
-// However, it does modify its receiver by wrapping Undo over it.
+// Peek returns the current Symbol in the input stream.
 func (s *Streamer) Peek() (a Symbol) {
 	a = s.Next()
 	*s = s.Undo(a)
