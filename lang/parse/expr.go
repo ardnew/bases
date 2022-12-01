@@ -29,12 +29,12 @@ func (e *Expr) Parse(r io.Reader) (n int64, err error) {
 func (e *Expr) ParseBuffer(b []byte) (n int64, err error) {
 	logf("ParseBuffer(%+v): %q", b, string(b))
 	e.Streamer = sym.Stream(b, sym.IsEOF, sym.IsIllegal)
-	e.item = e.Climb(0, oper.Unbound)
+	e.item = e.parse(oper.Unbound)
 	return
 }
 
 func (e *Expr) ParseString(s string) (n int64, err error) {
-	return
+	return e.ParseBuffer([]byte(s))
 }
 
 func (e *Expr) Err() error {
@@ -66,6 +66,27 @@ func wrap(s sym.Symbol) item {
 	default:
 		return newRule(s)
 	}
+}
+
+func (ex *Expr) parse(min oper.Level) item {
+	symbol := ex.Next()
+	switch it := wrap(symbol).(type) {
+	case *stop:
+		return it
+	case *term:
+		return it
+	case *ctrl:
+		return it
+	case *rule:
+		var pre bool
+		switch it.Operator, pre = oper.Default.Prefix(symbol.Token); {
+		case pre:
+			_, br := it.Level()
+			it.arg = append(it.arg, ex.parse(br))
+		}
+		return it
+	}
+	return nil
 }
 
 func (ex *Expr) Climb(depth int, min oper.Level) (it item) {
@@ -136,7 +157,7 @@ func (r *rule) String() string {
 	b.WriteRune('(')
 	b.WriteString(r.Operator.String())
 	for _, a := range r.arg {
-		b.WriteString(", ")
+		b.WriteRune(' ')
 		b.WriteString(a.String())
 	}
 	b.WriteRune(')')
