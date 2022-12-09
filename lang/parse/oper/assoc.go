@@ -16,9 +16,9 @@ const (
 	assocCount
 )
 
-// Level returns the LHS and RHS binding levels of an s-associative operator
+// Levels returns the LHS and RHS binding levels of an s-associative operator
 // with given precedence.
-func (s Assoc) Level(precedence int) (lhs, rhs Level) {
+func (s Assoc) Levels(precedence int) (lhs, rhs Level) {
 	if precedence > 0 {
 		n := 2 * precedence
 		switch s {

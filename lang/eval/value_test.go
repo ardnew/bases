@@ -17,25 +17,25 @@ func TestEvalString(t *testing.T) {
 		{
 			name:   "literal",
 			string: `"foo"`,
-			sex:    `"foo"`,
+			sex:    `(; "foo")`,
 		},
 
 		{
 			name:   "identifier",
 			string: `bar`,
-			sex:    `bar`,
+			sex:    `(; bar)`,
 		},
 
 		{
 			name:   "prefix A",
 			string: `++a`,
-			sex:    `(++ a)`,
+			sex:    `(; (++ a))`,
 		},
 
 		{
 			name:   "infix A",
 			string: `1 + 2 * 3`,
-			sex:    `(+ 1 (* 2 3))`,
+			sex:    `(; (+ 1 (* 2 3)))`,
 		},
 
 		{

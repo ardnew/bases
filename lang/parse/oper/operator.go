@@ -15,7 +15,16 @@ type Operator struct {
 	ass      Assoc
 }
 
-func (o Operator) Level() (Level, Level)       { return o.lbl, o.rbl }
+func (o Operator) Level() Level {
+	switch o.ass {
+	case UnaryLeft, BinaryLeft:
+		return o.lbl
+	case UnaryRight, BinaryRight:
+		return o.rbl
+	}
+	return Unbound
+}
+func (o Operator) Levels() (Level, Level)      { return o.lbl, o.rbl }
 func (o Operator) Symbol() sym.Symbol          { return o.sym }
 func (o Operator) Spells(tok token.Token) bool { return tok == o.sym.Token }
 func (o Operator) String() string              { return o.sym.String() }
@@ -34,7 +43,7 @@ func (p *operators) get(tok token.Token) (op Operator, ok bool) {
 }
 
 func (p *operators) add(prc int, ass Assoc, tok ...token.Token) {
-	lhs, rhs := ass.Level(prc)
+	lhs, rhs := ass.Levels(prc)
 	for _, t := range tok {
 		p[t] = Operator{
 			lbl: lhs, rbl: rhs,

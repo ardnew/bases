@@ -26,7 +26,7 @@ type scan struct {
 func Scan(buffer []byte) *scan {
 	// Use mode = scanner.ScanComments to emit COMMENT tokens.
 	const mode scanner.Mode = 0
-	l := &scan{
+	s := &scan{
 		Scanner:   &scanner.Scanner{},
 		ErrorList: &scanner.ErrorList{},
 		Gate:      make(chan Symbol),
@@ -34,25 +34,25 @@ func Scan(buffer []byte) *scan {
 	}
 	// Buffer must contain the entire input.
 	// No additional input may be appended to a Streamer.
-	l.Init(
+	s.Init(
 		token.NewFileSet().AddFile("", -1, len(buffer)),
 		buffer,
 		func(pos token.Position, msg string) {
 			logf("error (%s): %s", pos, msg)
-			l.Add(pos, msg)
+			s.Add(pos, msg)
 		},
 		mode,
 	)
 	// Spawn a goroutine to repeatedly tokenize the input into the Symbol channel
 	// field Gate.
-	go l.run()
-	return l
+	go s.run()
+	return s
 }
 
-func (l *scan) run() {
+func (s *scan) run() {
 	var halt bool
 	for !halt {
-		pos, tok, lit := l.Scan()
+		pos, tok, lit := s.Scan()
 		u := Symbol{Token: tok, Lit: lit, Pos: pos}
 		logf("Lex: SCAN: \"%s\" [%+v]", u, u)
 		// Block until we have either received a Symbol on the Quit channel, or
@@ -60,12 +60,12 @@ func (l *scan) run() {
 		select {
 		// Stop scanning input and exit this goroutine once anything is received on
 		// the Quit channel.
-		case q := <-l.Quit:
+		case q := <-s.Quit:
 			logf("Lex: QUIT: \"%s\" [%+v]", q, q)
 			halt = true
 		// Once the Symbol is received on the Gate channel, we immediately begin
 		// scanning input for the next Symbol.
-		case l.Gate <- u:
+		case s.Gate <- u:
 			logf("Lex: GATE: %s", u)
 		}
 	}

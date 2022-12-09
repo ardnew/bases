@@ -1,8 +1,6 @@
 package eval
 
 import (
-	"io"
-
 	"github.com/ardnew/bases/lang/parse"
 )
 
@@ -14,20 +12,20 @@ func New() *Value {
 	return &Value{Expr: parse.New()}
 }
 
-func (v *Value) Read(p []byte) (n int, err error) {
-	if err = v.Err(); err == nil {
-		return copy(p, v.String()), nil
-	}
-	return
-}
+// func (v *Value) Read(p []byte) (n int, err error) {
+// 	if err = v.Err(); err == nil {
+// 		return copy(p, v.String()), nil
+// 	}
+// 	return
+// }
 
-func (v *Value) WriteTo(w io.Writer) (n int64, err error) {
-	if err = v.Err(); err == nil {
-		m, e := w.Write([]byte(v.String()))
-		return int64(m), e
-	}
-	return
-}
+// func (v *Value) WriteTo(w io.Writer) (n int64, err error) {
+// 	if err = v.Err(); err == nil {
+// 		m, e := w.Write([]byte(v.String()))
+// 		return int64(m), e
+// 	}
+// 	return
+// }
 
 // Write implements the [io.Writer] interface by parsing the given buffer into
 // the receiver's underlying [parse.Expr].
@@ -45,9 +43,9 @@ func (v *Value) Write(p []byte) (n int, err error) {
 	return int(m), e
 }
 
-func (v *Value) ReadFrom(r io.Reader) (n int64, err error) {
-	return v.Parse(r)
-}
+// func (v *Value) ReadFrom(r io.Reader) (n int64, err error) {
+// 	return v.Parse(r)
+// }
 
 func (v *Value) String() string {
 	if err := v.Err(); err != nil {

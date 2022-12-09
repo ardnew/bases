@@ -69,22 +69,33 @@ func wrap(s sym.Symbol) item {
 }
 
 func (ex *Expr) parse(min oper.Level) item {
-	symbol := ex.Next()
-	switch it := wrap(symbol).(type) {
-	case *stop:
+	s0 := ex.Next()
+	var lhs item
+	switch it := wrap(s0).(type) {
+	case *stop, *ctrl:
 		return it
 	case *term:
-		return it
-	case *ctrl:
-		return it
+		lhs = it
 	case *rule:
-		var pre bool
-		switch it.Operator, pre = oper.Default.Prefix(symbol.Token); {
-		case pre:
-			_, br := it.Level()
-			it.arg = append(it.arg, ex.parse(br))
+		if op, pre := oper.Default.Prefix(s0.Token); pre {
+			lhs = &rule{append(it.arg, ex.parse(op.Level())), op}
 		}
-		return it
+	}
+	for {
+		s1 := ex.Next()
+		if op, ok := oper.Default.Get(
+			s1.Token, oper.UnaryLeft, oper.BinaryLeft, oper.BinaryRight,
+		); ok {
+			lbp, _ := op.Levels()
+			if lbp.Compare(min) < 0 {
+				ex.Streamer = ex.Undo(s1)
+				return lhs
+			}
+			return &rule{[]item{lhs}, op}
+
+		} else {
+			break
+		}
 	}
 	return nil
 }
@@ -106,7 +117,7 @@ func (ex *Expr) Climb(depth int, min oper.Level) (it item) {
 				ex.Streamer = ex.Undo(t)
 			}
 		case prefix:
-			_, br := e.Level()
+			_, br := e.Levels()
 			e.arg = append(e.arg, ex.Climb(depth+1, br))
 		default:
 		}
@@ -117,7 +128,7 @@ func (ex *Expr) Climb(depth int, min oper.Level) (it item) {
 			break
 		} else {
 			if op, ok := oper.Default.Postfix(os.Token); ok {
-				bl, _ := op.Level()
+				bl, _ := op.Levels()
 				if oper.Compare(bl, min) < 0 {
 					break
 				}
@@ -125,7 +136,7 @@ func (ex *Expr) Climb(depth int, min oper.Level) (it item) {
 				l = newRule(os, l)
 				continue
 			} else if op, ok := oper.Default.Infix(os.Token); ok {
-				bl, rl := op.Level()
+				bl, rl := op.Levels()
 				if oper.Compare(bl, min) < 0 {
 					break
 				}
