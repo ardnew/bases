@@ -2,7 +2,6 @@ package parse
 
 import (
 	"errors"
-	"go/token"
 	"io"
 	"strings"
 
@@ -55,111 +54,37 @@ type (
 	ctrl struct{ sym.Symbol }
 )
 
-func wrap(s sym.Symbol) item {
-	switch {
+func (ex *Expr) parse(min oper.Level) (i item) {
+	switch s := ex.Next(); {
 	case s.IsIllegal(), s.IsEOF():
 		return &stop{s}
-	case s.IsIdentifier(), s.IsLiteral():
-		return &term{s}
 	case s.IsKeyword():
 		return &ctrl{s}
+	case s.IsIdentifier(), s.IsLiteral():
+		i = &term{s}
 	default:
-		return newRule(s)
-	}
-}
-
-func (ex *Expr) parse(min oper.Level) item {
-	s0 := ex.Next()
-	var lhs item
-	switch it := wrap(s0).(type) {
-	case *stop, *ctrl:
-		return it
-	case *term:
-		lhs = it
-	case *rule:
-		if op, pre := oper.Default.Prefix(s0.Token); pre {
-			lhs = &rule{append(it.arg, ex.parse(op.Level())), op}
+		if op, ok := oper.Default.Prefix(s.Token); ok {
+			i = &rule{[]item{ex.parse(op.Level())}, op}
+		} else {
+			return &stop{s}
 		}
 	}
 	for {
-		s1 := ex.Next()
-		if op, ok := oper.Default.Get(
-			s1.Token, oper.UnaryLeft, oper.BinaryLeft, oper.BinaryRight,
-		); ok {
-			lbp, _ := op.Levels()
-			if lbp.Compare(min) < 0 {
-				ex.Streamer = ex.Undo(s1)
-				return lhs
-			}
-			return &rule{[]item{lhs}, op}
-
-		} else {
-			break
+		op, ok := oper.Default.Get(ex.Next().Token,
+			oper.UnaryLeft, oper.BinaryLeft, oper.BinaryRight)
+		if !ok {
+			return
 		}
-	}
-	return nil
-}
-
-func (ex *Expr) Climb(depth int, min oper.Level) (it item) {
-	s := ex.Next()
-	l := wrap(s)
-	logf("%*s%s -> %T:", depth*2, "", s, l)
-	switch e := l.(type) {
-	case *stop:
-
-	case *term, *ctrl:
-	case *rule:
-		var prefix bool
-		switch e.Operator, prefix = oper.Default.Prefix(s.Token); {
-		case e.Spells(token.LPAREN):
-			l = ex.Climb(depth+1, oper.Unbound)
-			if t := ex.Next(); !t.Is(sym.Operator(token.RPAREN)) {
-				ex.Streamer = ex.Undo(t)
-			}
-		case prefix:
-			_, br := e.Levels()
-			e.arg = append(e.arg, ex.Climb(depth+1, br))
-		default:
+		l, r := op.Levels()
+		if l.Compare(min) < 0 {
+			ex.Streamer = ex.Undo(op.Symbol())
+			return
 		}
-	}
-
-	for {
-		if os := ex.Peek(); os.IsEOF() {
-			break
-		} else {
-			if op, ok := oper.Default.Postfix(os.Token); ok {
-				bl, _ := op.Levels()
-				if oper.Compare(bl, min) < 0 {
-					break
-				}
-				ex.Next()
-				l = newRule(os, l)
-				continue
-			} else if op, ok := oper.Default.Infix(os.Token); ok {
-				bl, rl := op.Levels()
-				if oper.Compare(bl, min) < 0 {
-					break
-				}
-				ex.Next()
-				r := ex.Climb(depth+1, rl)
-				l = newRule(os, l, r)
-				continue
-			} else {
-				// Error!
-				logf("Unexpected token: %T: %q [% x]", os, os, os)
-				ex.Next()
-				break
-			}
+		a := []item{i}
+		if r != oper.Unbound {
+			a = append(a, ex.parse(r))
 		}
-	}
-	logf("%*s= %s", depth*2, "", l)
-	return l
-}
-
-func newRule(s sym.Symbol, it ...item) *rule {
-	return &rule{
-		Operator: oper.Wrap(s),
-		arg:      append(make([]item, 0, oper.MaxArity), it...),
+		i = &rule{a, op}
 	}
 }
 

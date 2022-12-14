@@ -16,10 +16,10 @@
         "-test.run=TestEvalString"
       ],
       "env": {
-        "EXPR_FILE": "/dev/stderr",
-        "EXPR_FORMAT": "[%t] %f:%n ┆ %s",
+        "SYM_FILE": "/dev/stderr",
+        "SYM_FORMAT": "[%t] SYM %f:%n ┆ %s",
         "PARSE_FILE": "/dev/stderr",
-        "PARSE_FORMAT": "[%t] %f:%n ┆ %s",
+        "PARSE_FORMAT": "[%t] PARSE %f:%n ┆ %s",
       },
       "dlvFlags": [],
       "stopOnEntry": true, // NOT "stop on main entry"

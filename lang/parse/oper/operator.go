@@ -26,6 +26,7 @@ func (o Operator) Level() Level {
 }
 func (o Operator) Levels() (Level, Level)      { return o.lbl, o.rbl }
 func (o Operator) Symbol() sym.Symbol          { return o.sym }
+func (o Operator) Assoc() Assoc                { return o.ass }
 func (o Operator) Spells(tok token.Token) bool { return tok == o.sym.Token }
 func (o Operator) String() string              { return o.sym.String() }
 

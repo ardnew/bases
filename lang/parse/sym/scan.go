@@ -66,7 +66,7 @@ func (s *scan) run() {
 		// Once the Symbol is received on the Gate channel, we immediately begin
 		// scanning input for the next Symbol.
 		case s.Gate <- u:
-			logf("Lex: GATE: %s", u)
+			// logf("Lex: GATE (in): %s", u)
 		}
 	}
 }

@@ -36,7 +36,7 @@ func (t *Table) Get(tok token.Token, assoc ...Assoc) (op Operator, ok bool) {
 	for _, ass := range assoc {
 		if Nonassociative < ass && ass < assocCount {
 			if op, ok = getDefault[ass](tok); ok {
-				break
+				return
 			}
 		}
 	}

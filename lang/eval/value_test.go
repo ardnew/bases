@@ -17,31 +17,31 @@ func TestEvalString(t *testing.T) {
 		{
 			name:   "literal",
 			string: `"foo"`,
-			sex:    `(; "foo")`,
+			sex:    `(; "foo" EOF)`,
 		},
 
 		{
 			name:   "identifier",
 			string: `bar`,
-			sex:    `(; bar)`,
+			sex:    `(; bar EOF)`,
 		},
 
 		{
 			name:   "prefix A",
 			string: `++a`,
-			sex:    `(; (++ a))`,
+			sex:    `(; (++ a) EOF)`,
 		},
 
 		{
 			name:   "infix A",
 			string: `1 + 2 * 3`,
-			sex:    `(; (+ 1 (* 2 3)))`,
+			sex:    `(; (+ 1 (* 2 3)) EOF)`,
 		},
 
 		{
 			name:   "infix B",
 			string: `a + b * c * d + e`,
-			sex:    `(+ (+ a (* (* b c) d)) e)`,
+			sex:    `(; (+ (+ a (* (* b c) d)) e) EOF)`,
 		},
 
 		// TODO: Add test cases.
